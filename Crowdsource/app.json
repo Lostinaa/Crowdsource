@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "cs-qoe",
+    "slug": "cs-qoe",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dopy.csqoe"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.dopy.csqoe",
+      "permissions": [
+        "READ_PHONE_STATE",
+        "READ_CALL_LOG",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "@maplibre/maplibre-react-native"
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ab05d62d-ae57-46ec-8e8a-fd3061115828"
+      }
+    },
+    "owner": "dopy",
+    "updates": {
+      "url": "https://u.expo.dev/ab05d62d-ae57-46ec-8e8a-fd3061115828"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
+  }
+}

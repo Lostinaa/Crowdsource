@@ -1,0 +1,78 @@
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Backend specific
+backend/storage/*
+!backend/storage/.gitignore
+backend/bootstrap/cache/*
+!backend/bootstrap/cache/.gitignore
+backend/vendor/
+backend/.phpunit.result.cache
+backend/.phpunit.cache/
+
+# Git backups
+Crowdsource/.git.backup/
+
+# Frontend specific (Crowdsource)
+Crowdsource/node_modules/
+Crowdsource/.expo/
+Crowdsource/dist/
+Crowdsource/web-build/
+Crowdsource/expo-env.d.ts
+Crowdsource/.kotlin/
+Crowdsource/*.orig.*
+Crowdsource/*.jks
+Crowdsource/*.p8
+Crowdsource/*.p12
+Crowdsource/*.key
+Crowdsource/*.mobileprovision
+Crowdsource/.metro-health-check*
+Crowdsource/npm-debug.*
+Crowdsource/yarn-debug.*
+Crowdsource/yarn-error.*
+Crowdsource/*.tsbuildinfo
+Crowdsource/ios/
+Crowdsource/android/
+
