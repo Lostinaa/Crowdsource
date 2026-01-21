@@ -1,5 +1,4 @@
 package expo.modules.callmetrics
-
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -16,10 +15,8 @@ import com.google.android.gms.location.CurrentLocationRequest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
 import java.text.DecimalFormat
-
 class DeviceDiagnosticModule : Module() {
 
-    // Define a scope for our background tasks tied to Dispatchers.IO
     private val moduleScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun definition() = ModuleDefinition {
@@ -30,19 +27,20 @@ class DeviceDiagnosticModule : Module() {
             val hasFine = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
             val hasBackground = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
-            } else { true }
+            } else {
+                true
+            }
 
             mapOf("fineLocation" to hasFine, "backgroundLocation" to hasBackground)
         }
 
-        // Updated syntax to handle the Promise inside a Coroutine scope
         AsyncFunction("getFullDiagnostics") { promise: Promise ->
             moduleScope.launch {
                 try {
                     val context = appContext.reactContext ?: throw Exception("Context not found")
                     val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
                     val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-                    
+
                     val data = mutableMapOf<String, Any?>()
 
                     // I. DEVICE & NETWORK INFO
@@ -62,9 +60,8 @@ class DeviceDiagnosticModule : Module() {
                             .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
                             .build()
 
-                        // Use .await() from kotlinx-coroutines-play-services
                         val location: Location? = fusedLocationClient.getCurrentLocation(locationRequest, null).await()
-                        
+
                         val df = DecimalFormat("#.#####")
                         data["lat"] = location?.latitude?.let { df.format(it) } ?: "No Fix"
                         data["lon"] = location?.longitude?.let { df.format(it) } ?: "No Fix"
@@ -77,11 +74,10 @@ class DeviceDiagnosticModule : Module() {
                     // III. SIGNAL DATA
                     processSignalAndCell(tm, data)
 
-                    // Successfully return the data to JavaScript
                     promise.resolve(data)
 
-                } catch (e: Exception) {
-                    promise.reject("ERR_DIAGNOSTICS", e.message, e)
+                } catch (exception: Exception) {
+                    promise.reject("ERR_DIAGNOSTICS", exception.message, exception)
                 }
             }
         }
@@ -94,39 +90,75 @@ class DeviceDiagnosticModule : Module() {
                 data["netType"] = "Searching..."
                 return
             }
-            
+
+            val signalInfo = checkSignalInfo(tm)
+            data["rsrp"] = signalInfo[0]
+            data["rsrq"] = signalInfo[1]
+            data["rssnr"] = signalInfo[2]
+            data["cqi"] = signalInfo[3]
+
             val info = allCellInfo.find { it.isRegistered } ?: allCellInfo[0]
             when (info) {
                 is CellInfoLte -> {
                     val id = info.cellIdentity
-                    val signal = info.cellSignalStrength
                     data["netType"] = "4G LTE"
                     data["enb"] = if (id.ci != Int.MAX_VALUE) (id.ci shr 8).toString() else "---"
                     data["eci"] = formatValue(id.ci)
                     data["cellId"] = if (id.ci != Int.MAX_VALUE) (id.ci % 256).toString() else "---"
                     data["tac"] = formatValue(id.tac)
                     data["pci"] = formatValue(id.pci)
-                    data["rsrp"] = formatValue(signal.rsrp)
-                    data["rsrq"] = formatValue(signal.rsrq)
-                    data["rssnr"] = formatValue(signal.rssnr)
                 }
                 is CellInfoNr -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         val id = info.cellIdentity as CellIdentityNr
-                        val signal = info.cellSignalStrength as CellSignalStrengthNr
                         data["netType"] = "5G NR"
                         data["enb"] = if (id.nci != Long.MAX_VALUE) (id.nci / 16384).toString() else "---"
                         data["eci"] = formatValue(id.nci)
-                        data["rsrp"] = formatValue(signal.ssRsrp)
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (exception: Exception) {
             data["netType"] = "Access Denied"
         }
     }
 
-    private fun formatValue(value: Any?): String = 
+    private fun checkSignalInfo(tm: TelephonyManager): Array<String> {
+        val numbers = arrayOf("---", "---", "---", "---")
+        
+        val safeContext = appContext.reactContext
+
+        if (safeContext != null) {
+            val cellInfos: List<CellInfo>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                if (ActivityCompat.checkSelfPermission(safeContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    tm.allCellInfo
+                } else {
+                    null
+                }
+            } else null
+
+            if (cellInfos != null && cellInfos.isNotEmpty()) {
+                when (val info = cellInfos[0]) {
+                    is CellInfoLte -> {
+                        val signal = info.cellSignalStrength
+                        numbers[0] = formatValue(signal.rsrp)
+                        numbers[1] = formatValue(signal.rsrq)
+                        numbers[2] = formatValue(signal.rssnr)
+                        numbers[3] = formatValue(signal.cqi)
+                    }
+                    is CellInfoNr -> {
+                        val signal = info.cellSignalStrength as CellSignalStrengthNr
+                        numbers[0] = formatValue(signal.ssRsrp)
+                        numbers[1] = formatValue(signal.ssRsrq)
+                        numbers[2] = formatValue(signal.csiSinr)
+                        numbers[3] = "---"
+                    }
+                }
+            }
+        }
+        return numbers
+    }
+
+    private fun formatValue(value: Any?): String =
         if (value == null || value == Int.MAX_VALUE || value == Long.MAX_VALUE || value == -1 || value == -1L) "---" else value.toString()
 
     private fun getNetDataState(s: Int) = when(s) {

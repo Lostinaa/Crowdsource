@@ -7,7 +7,8 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    View
+    View,
+    Linking
 } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
 import { theme } from '../../src/constants/theme';
@@ -69,16 +70,30 @@ export default function NetworkTab() {
 
           if (!backgroundStatus) {
             Alert.alert(
-              "Background Access Required",
-              "To monitor signal quality while the app is in the background, please select 'Allow all the time' on the next screen.",
+              "Permission Needed!",
+              "Background Location Permission Needed to get  your device network coverage information while you are not using this app! Would you please select 'Allow all time' in the next screen.",
               [
                 { text: "Cancel", style: "cancel" },
                 {
-                  text: "Settings",
+                  text: "OK",
                   onPress: async () => {
-                    await PermissionsAndroid.request(
+                    // Triggering the direct system request
+                    // NOTE: On Android 11+, this triggers the system settings redirect
+                    const bgGranted = await PermissionsAndroid.request(
                       PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION
                     );
+                    
+                    if (bgGranted !== PermissionsAndroid.RESULTS.GRANTED) {
+                        // If they didn't select 'Allow all the time', we prompt them to go to settings manually
+                        Alert.alert(
+                            "Action Required",
+                            "You selected 'Only while using'. To get full coverage info, please go to Permissions > Location and select 'Allow all the time'.",
+                            [
+                                { text: "Later", style: "cancel" },
+                                { text: "Go to Settings", onPress: () => Linking.openSettings() }
+                            ]
+                        );
+                    }
                   }
                 }
               ]

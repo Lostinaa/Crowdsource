@@ -126,6 +126,35 @@ export default function DataScreen() {
       setIsTesting(false);
     }
   };
+  const fulltest = async () => {
+    if (isTesting) return;
+    
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) {
+      Alert.alert('No Internet', 'Please check your connection before starting the full test.');
+      return;
+    }
+
+    setIsTesting(true);
+    
+    try {
+      // Step-by-step execution using 'silent' mode to prevent multiple alerts and state conflicts
+      await testBrowsing(true);
+      await testStreaming(true);
+      await testHttpDownload(true);
+      await testHttpUpload(true);
+      await testSocialMedia(true);
+      await testFtpDownload(true);
+      await testFtpUpload(true);
+      await testLatency(true);
+
+      Alert.alert('Full Test Complete', 'All QoE performance metrics have been updated.');
+    } catch (error) {
+      Alert.alert('Full Test Partial Failure', 'One or more tests failed to complete.');
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   // Real streaming test with actual video/audio streaming
   const testStreaming = async () => {
@@ -815,6 +844,14 @@ export default function DataScreen() {
       )}
 
       {/* Browsing Metrics */}
+       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Do Full test</Text>
+         <Button 
+          title="Full test" 
+          onPress={fulltest} 
+          disabled={isTesting}
+        />
+       </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Browsing</Text>
         <Button 

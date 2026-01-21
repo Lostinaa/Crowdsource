@@ -8,11 +8,11 @@ import { useQoE } from '../../src/context/QoEContext';
 import { backendApi } from '../../src/services/backendApi';
 import { theme } from '../../src/constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { requireNativeModule } from 'expo-modules-core';
 const BACKEND_URL_KEY = '@backend_url';
 const BACKEND_API_KEY = '@backend_api_key';
 const AUTO_SYNC_KEY = '@auto_sync_enabled';
-
+const DeviceDiagnosticModule = requireNativeModule('DeviceDiagnosticModule');
 export default function SettingsScreen() {
   const { metrics, scores, history, resetMetrics, clearHistory } = useQoE();
   const [autoSave, setAutoSave] = useState(false);
@@ -32,7 +32,7 @@ export default function SettingsScreen() {
           AsyncStorage.getItem(AUTO_SYNC_KEY),
         ]);
         // Use saved URL or default to local backend
-        const backendUrlToUse = url || 'http://192.168.1.5:8000/api';
+        const backendUrlToUse = url || 'http://10.72.71.72:8000/api';
         setBackendUrl(backendUrlToUse);
         backendApi.setBackendUrl(backendUrlToUse);
         if (key) {
@@ -204,57 +204,141 @@ export default function SettingsScreen() {
     }
   };
 
-  const syncToBackend = async () => {
-    if (isSyncing) return;
+  // const syncToBackend = async () => {
+  //   if (isSyncing) return;
     
-    setIsSyncing(true);
-    setSyncStatus('Syncing...');
+  //   setIsSyncing(true);
+  //   setSyncStatus('Syncing...');
     
-    try {
-      // Get device info
-      const deviceInfo = {
-        platform: Platform.OS,
-        model: Device.modelName || 'unknown',
-        osVersion: Platform.Version.toString(),
-        appVersion: '1.0.0',
-      };
+  //   try {
+  //     // Get device info
+  //     const deviceInfo = {
+  //       platform: Platform.OS,
+  //       model: Device.modelName || 'unknown',
+  //       osVersion: Platform.Version.toString(),
+  //       appVersion: '1.0.0',
+  //     };
 
-      // Get location if available
-      let location = null;
-      try {
-        const { status } = await Location.getForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          location = {
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-            accuracy: loc.coords.accuracy,
-            timestamp: loc.timestamp,
-          };
-        }
-      } catch (locError) {
-        console.warn('[Settings] Failed to get location:', locError);
-      }
+  //     // Get location if available
+  //     let location = null;
+  //     try {
+  //       const { status } = await Location.getForegroundPermissionsAsync();
+  //       if (status === 'granted') {
+  //         const loc = await Location.getCurrentPositionAsync({
+  //           accuracy: Location.Accuracy.Balanced,
+  //         });
+  //         location = {
+  //           latitude: loc.coords.latitude,
+  //           longitude: loc.coords.longitude,
+  //           accuracy: loc.coords.accuracy,
+  //           timestamp: loc.timestamp,
+  //         };
+  //       }
+  //     } catch (locError) {
+  //       console.warn('[Settings] Failed to get location:', locError);
+  //     }
 
-      const result = await backendApi.sendMetrics(metrics, scores, deviceInfo, location);
+  //     const result = await backendApi.sendMetrics(metrics, scores, deviceInfo, location);
       
-      if (result.success) {
-        setSyncStatus('Sync successful');
-        Alert.alert('Success', 'Data synced to backend successfully!');
-      } else {
-        setSyncStatus('Sync failed: ' + result.error);
-        Alert.alert('Warning', 'Sync failed: ' + result.error);
-      }
-    } catch (error) {
-      setSyncStatus('Sync error: ' + error.message);
-      Alert.alert('Error', 'Failed to sync: ' + error.message);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+  //     if (result.success) {
+  //       setSyncStatus('Sync successful');
+  //       Alert.alert('Success', 'Data synced to backend successfully!');
+  //     } else {
+  //       setSyncStatus('Sync failed: ' + result.error);
+  //       Alert.alert('Warning', 'Sync failed: ' + result.error);
+  //     }
+  //   } catch (error) {
+  //     setSyncStatus('Sync error: ' + error.message);
+  //     Alert.alert('Error', 'Failed to sync: ' + error.message);
+  //   } finally {
+  //     setIsSyncing(false);
+  //   }
+  // };
+const syncToBackend = async () => {
+  if (isSyncing) return;
+  setIsSyncing(true);
+  setSyncStatus('Syncing...');
 
+  try {
+    // 1. Fetch diagnostics from Native Module safely
+    let diagnostics = null;
+    if (DeviceDiagnosticModule) {
+      try {
+        diagnostics = await DeviceDiagnosticModule.getFullDiagnostics();
+      } catch (e) {
+        console.warn('[Settings] Native diagnostics failed', e);
+      }
+    }
+
+    // 2. Assemble ONE FLAT Object
+    // We remove "signalQuality", "cellIdentity", etc. 
+    // This allows the backend to see "rsrp", "cellId", etc. as individual fields.
+    const deviceInfo = {
+      // Device Details
+      platform: Platform.OS,
+      model: Device.modelName || 'unknown',
+      osVersion: Platform.Version.toString(),
+      appVersion: '1.0.0',
+      brand: diagnostics?.brand || Device.brand || 'N/A',
+      Android_version: diagnostics?.Version || Platform.Version.toString(),
+      operator: diagnostics?.operator || 'N/A',
+      
+      // Signal KPIs (Now at root level)
+      rsrp: diagnostics?.rsrp ?? 'N/A',
+      rsrq: diagnostics?.rsrq ?? 'N/A',
+      rssnr: diagnostics?.rssnr ?? 'N/A',
+      cqi: diagnostics?.cqi ?? 'N/A',
+      netType: diagnostics?.netType ?? 'N/A',
+      
+      // Cell Identity KPIs (Now at root level)
+      enb: diagnostics?.enb ?? 'N/A',
+      cellId: diagnostics?.cellId ?? 'N/A',
+      pci: diagnostics?.pci ?? 'N/A',
+      tac: diagnostics?.tac ?? 'N/A',
+      eci: diagnostics?.eci ?? 'N/A',
+      
+      // Network State KPIs (Now at root level)
+      dataState: diagnostics?.dataState ?? 'N/A',
+      dataActivity: diagnostics?.dataActivity ?? 'N/A',
+      callState: diagnostics?.callState ?? 'N/A',
+      simState: diagnostics?.simState ?? 'N/A',
+      isRoaming: diagnostics?.isRoaming ?? 'N/A',
+    };
+
+    // 3. Get Location
+    let location = null;
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        location = {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          accuracy: loc.coords.accuracy,
+          timestamp: loc.timestamp,
+        };
+      }
+    } catch (locError) {
+      console.warn('[Settings] Location error', locError);
+    }
+
+    // 4. Send the flattened data to the backend
+    const result = await backendApi.sendMetrics(metrics, scores, deviceInfo, location);
+
+    if (result.success) {
+      setSyncStatus('Sync successful');
+      Alert.alert('Success', 'Data synced successfully!');
+    } else {
+      setSyncStatus('Sync failed: ' + result.error);
+      Alert.alert('Warning', 'Sync failed: ' + result.error);
+    }
+  } catch (error) {
+    setSyncStatus('Error: ' + error.message);
+    Alert.alert('Sync Error', error.message);
+  } finally {
+    setIsSyncing(false);
+  }
+};
   const SettingItem = ({ title, description, onPress, rightComponent, danger = false }) => (
     <TouchableOpacity
       style={styles.settingItem}
