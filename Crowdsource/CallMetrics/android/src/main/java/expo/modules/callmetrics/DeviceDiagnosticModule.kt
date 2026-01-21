@@ -91,6 +91,17 @@ class DeviceDiagnosticModule : Module() {
                 return
             }
 
+            // NSA 5G note:
+            // On many devices/carriers, 5G "NR_NSA" is shown as an override on top of an LTE anchor.
+            // In that case CellInfoLte is often "registered", while CellInfoNr exists but is not registered.
+            // nPerf-style UX should still display 5G when NR neighbors are present.
+            val nrCells = allCellInfo.filterIsInstance<CellInfoNr>()
+            val hasNrNeighbor = nrCells.any { nr ->
+                val ss = nr.cellSignalStrength as? CellSignalStrengthNr
+                // Treat as present if SS-RSRP looks like a real value (not default/invalid)
+                ss != null && ss.ssRsrp != Int.MAX_VALUE && ss.ssRsrp > -140
+            }
+
             val signalInfo = checkSignalInfo(tm)
             data["rsrp"] = signalInfo[0]
             data["rsrq"] = signalInfo[1]
@@ -101,7 +112,7 @@ class DeviceDiagnosticModule : Module() {
             when (info) {
                 is CellInfoLte -> {
                     val id = info.cellIdentity
-                    data["netType"] = "4G LTE"
+                    data["netType"] = if (hasNrNeighbor) "5G NR (NSA)" else "4G LTE"
                     data["enb"] = if (id.ci != Int.MAX_VALUE) (id.ci shr 8).toString() else "---"
                     data["eci"] = formatValue(id.ci)
                     data["cellId"] = if (id.ci != Int.MAX_VALUE) (id.ci % 256).toString() else "---"

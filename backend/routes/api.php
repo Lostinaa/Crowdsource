@@ -6,6 +6,7 @@ use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MetricsController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CoverageSampleController;
 
 /*
 |--------------------------------------------------------------------------
@@ -24,6 +25,7 @@ Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/metrics', [MetricsController::class, 'store']);
 Route::get('/metrics', [MetricsController::class, 'index']);
 Route::get('/metrics/{id}', [MetricsController::class, 'show']);
+Route::post('/coverage-samples', [CoverageSampleController::class, 'store']);
 
 // Protected routes (require authentication)
 Route::middleware('auth:sanctum')->group(function () {

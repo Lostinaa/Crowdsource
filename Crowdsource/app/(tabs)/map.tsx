@@ -6,6 +6,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
 import DeviceDiagnosticModule from '../../CallMetrics/src/DeviceDiagnosticModule';
+import { backendApi } from '../../src/services/backendApi';
 
 // Ethio Telecom regions (simplified - you can expand this with actual region boundaries)
 const ETHIO_TELECOM_REGIONS = [
@@ -54,6 +55,9 @@ export default function MapScreen() {
     rsrq?: string;
     rssnr?: string;
     cqi?: string;
+    pci?: string;
+    tac?: string;
+    eci?: string;
     lat?: string;
     lon?: string;
     accuracy?: string;
@@ -204,12 +208,11 @@ export default function MapScreen() {
     return () => unsubscribe();
   }, []);
 
-  const rawNetworkLabel =
-    diagnostics?.netType ||
-    networkState?.details?.cellularGeneration ||
-    networkState?.type ||
-    null;
-  const networkCategory = getNetworkCategory(rawNetworkLabel);
+  // Prefer native diagnostics netType when available (handles 5G NSA correctly),
+  // otherwise fall back to NetInfo.
+  const networkCategory = diagnostics?.netType
+    ? getNetworkCategory(diagnostics.netType)
+    : getNetworkCategory(networkState?.details?.cellularGeneration || networkState?.type || null);
   const networkColor = NETWORK_COLORS[networkCategory] || NETWORK_COLORS.unknown;
 
   // Build an nPerf-like trail: record points as we move with current network quality
@@ -240,6 +243,38 @@ export default function MapScreen() {
       return next;
     });
   }, [location, networkCategory, diagnostics?.rsrp]);
+
+  // Push latest point to backend (fire-and-forget)
+  useEffect(() => {
+    if (!trackPoints.length) return;
+    const last = trackPoints[trackPoints.length - 1];
+    const sample = {
+      timestamp: new Date().toISOString(),
+      latitude: last.latitude,
+      longitude: last.longitude,
+      accuracy: location?.coords?.accuracy,
+      networkType: diagnostics?.netType || networkCategory,
+      networkCategory,
+      rsrp: diagnostics?.rsrp,
+      rsrq: diagnostics?.rsrq,
+      rssnr: diagnostics?.rssnr,
+      cqi: diagnostics?.cqi,
+      enb: diagnostics?.enb,
+      cellId: diagnostics?.cellId,
+      pci: diagnostics?.pci,
+      tac: diagnostics?.tac,
+      eci: diagnostics?.eci,
+      raw: {
+        diagnostics,
+        networkStateType: networkState?.type,
+        netinfoGeneration: networkState?.details?.cellularGeneration,
+      },
+    };
+
+    backendApi.sendCoverageSample(sample).catch(err => {
+      console.warn('[Map] Failed to send coverage sample:', err);
+    });
+  }, [trackPoints]);
 
   return (
     <View style={styles.container}>
@@ -283,8 +318,12 @@ export default function MapScreen() {
           <Text style={styles.infoTitle}>Network Technology</Text>
           <View style={styles.infoRow}>
             <View style={[styles.networkIndicator, { backgroundColor: networkColor }]} />
-            <Text style={styles.infoValue}>{networkCategory}</Text>
+            <Text style={styles.infoValue}>{diagnostics?.netType || networkCategory}</Text>
           </View>
+          {/* Debug: show how we're categorizing for color */}
+          <Text style={styles.infoSubtext}>
+            Category (color driver): {networkCategory} ({networkColor})
+          </Text>
           {diagnostics?.netType && (
             <Text style={styles.infoSubtext}>
               Reported: {diagnostics.netType}
@@ -352,6 +391,7 @@ export default function MapScreen() {
               {/* User location marker */}
             {location && (
                 <PointAnnotation
+                  key={`user-location-${networkCategory}`}
                   id="user-location"
                   coordinate={[location.coords.longitude, location.coords.latitude]}
                   title="Your Location"

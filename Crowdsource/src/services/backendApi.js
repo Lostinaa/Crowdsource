@@ -159,6 +159,48 @@ class BackendApiClient {
   }
 
   /**
+   * Send a single coverage sample (map trail point) to backend
+   */
+  async sendCoverageSample(sample) {
+    const payload = {
+      timestamp: sample.timestamp || new Date().toISOString(),
+      latitude: sample.latitude,
+      longitude: sample.longitude,
+      accuracy: sample.accuracy,
+      network_type: sample.networkType,
+      network_category: sample.networkCategory,
+      rsrp: sample.rsrp,
+      rsrq: sample.rsrq,
+      rssnr: sample.rssnr,
+      cqi: sample.cqi,
+      enb: sample.enb,
+      cell_id: sample.cellId,
+      pci: sample.pci,
+      tac: sample.tac,
+      eci: sample.eci,
+      raw: sample.raw || null,
+    };
+
+    try {
+      const response = await fetch(`${this.baseUrl}/coverage-samples`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Backend API error: ${response.status} ${response.statusText}`);
+      }
+
+      return { success: true, data: await response.json() };
+    } catch (error) {
+      console.error('[BackendAPI] Failed to send coverage sample:', error);
+      this.syncQueue.push({ type: 'coverage', payload, timestamp: Date.now(), retryCount: 0 });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Send history entry to backend
    */
   async sendHistoryEntry(historyEntry, deviceInfo = {}, location = null) {
@@ -186,6 +228,8 @@ class BackendApiClient {
       try {
         if (item.type === 'metrics') {
           await this.sendMetrics(item.payload.metrics, item.payload.scores, item.payload.deviceInfo, item.payload.location);
+        } else if (item.type === 'coverage') {
+          await this.sendCoverageSample(item.payload);
         }
       } catch (error) {
         console.error('[BackendAPI] Failed to sync queued item:', error);
