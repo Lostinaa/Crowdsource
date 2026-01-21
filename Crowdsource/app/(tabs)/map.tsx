@@ -5,6 +5,7 @@ import { MapView, Camera, PointAnnotation } from '@maplibre/maplibre-react-nativ
 import NetInfo from '@react-native-community/netinfo';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
+import DeviceDiagnosticModule from '../../CallMetrics/src/DeviceDiagnosticModule';
 
 // Ethio Telecom regions (simplified - you can expand this with actual region boundaries)
 const ETHIO_TELECOM_REGIONS = [
@@ -29,13 +30,13 @@ const NETWORK_COLORS = {
   'unknown': '#6b7280', // Gray
 };
 
-const getNetworkType = (type: string | null): string => {
-  if (!type) return 'unknown';
-  const upperType = type.toUpperCase();
-  if (upperType.includes('5G') || upperType.includes('NR')) return '5G';
-  if (upperType.includes('4G') || upperType.includes('LTE')) return '4G';
-  if (upperType.includes('3G') || upperType.includes('UMTS') || upperType.includes('HSPA')) return '3G';
-  if (upperType.includes('2G') || upperType.includes('EDGE') || upperType.includes('GPRS')) return '2G';
+const getNetworkCategory = (value: string | null | undefined): keyof typeof NETWORK_COLORS => {
+  if (!value) return 'unknown';
+  const upper = value.toUpperCase();
+  if (upper.includes('5G') || upper.includes('NR')) return '5G';
+  if (upper.includes('4G') || upper.includes('LTE')) return '4G';
+  if (upper.includes('3G') || upper.includes('UMTS') || upper.includes('HSPA')) return '3G';
+  if (upper.includes('2G') || upper.includes('EDGE') || upper.includes('GPRS')) return '2G';
   return 'unknown';
 };
 
@@ -43,7 +44,29 @@ export default function MapScreen() {
   const { metrics } = useQoE();
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [locationPermission, setLocationPermission] = useState(false);
+  const [phoneStatePermission, setPhoneStatePermission] = useState(false);
   const [networkState, setNetworkState] = useState<any>(null);
+  const [diagnostics, setDiagnostics] = useState<{
+    netType?: string;
+    enb?: string;
+    cellId?: string;
+    rsrp?: string;
+    rsrq?: string;
+    rssnr?: string;
+    cqi?: string;
+    lat?: string;
+    lon?: string;
+    accuracy?: string;
+  } | null>(null);
+  const [trackPoints, setTrackPoints] = useState<
+    {
+      id: string;
+      longitude: number;
+      latitude: number;
+      category: keyof typeof NETWORK_COLORS;
+      rsrp?: string;
+    }[]
+  >([]);
   const [currentRegion, setCurrentRegion] = useState<string>('Unknown');
   const [mapError, setMapError] = useState(false);
   const cameraRef = useRef<any>(null);
@@ -54,24 +77,27 @@ export default function MapScreen() {
     const requestLocationPermission = async () => {
       if (Platform.OS === 'android') {
         try {
-          const granted = await PermissionsAndroid.request(
+          const granted = await PermissionsAndroid.requestMultiple([
             PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-            {
-              title: 'Location Permission',
-              message: 'This app needs access to your location to display network coverage on the map.',
-              buttonNeutral: 'Ask Me Later',
-              buttonNegative: 'Cancel',
-              buttonPositive: 'OK',
-            }
-          );
-          setLocationPermission(granted === PermissionsAndroid.RESULTS.GRANTED);
+            PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
+          ]);
+
+          const fineGranted =
+            granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] === PermissionsAndroid.RESULTS.GRANTED;
+          const phoneGranted =
+            granted[PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE] === PermissionsAndroid.RESULTS.GRANTED;
+
+          setLocationPermission(fineGranted);
+          setPhoneStatePermission(phoneGranted);
         } catch (err) {
           console.warn('[Map] Permission error:', err);
           setLocationPermission(false);
+          setPhoneStatePermission(false);
         }
       } else {
         const { status } = await Location.requestForegroundPermissionsAsync();
         setLocationPermission(status === 'granted');
+        setPhoneStatePermission(false);
       }
     };
 
@@ -138,6 +164,33 @@ export default function MapScreen() {
     return () => clearInterval(interval);
   }, [locationPermission]);
 
+  // Poll native diagnostics (signal + cell info) where available (Android)
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    let isMounted = true;
+
+    const tick = async () => {
+      try {
+        const res = await DeviceDiagnosticModule.getFullDiagnostics();
+        if (!isMounted) return;
+        setDiagnostics(res ?? null);
+      } catch (error) {
+        // Don't spam alerts; just log once per tick.
+        console.warn('[Map] Diagnostics error:', error);
+      }
+    };
+
+    if (Platform.OS === 'android' && locationPermission && phoneStatePermission) {
+      tick();
+      interval = setInterval(tick, 2000);
+    }
+
+    return () => {
+      isMounted = false;
+      if (interval) clearInterval(interval);
+    };
+  }, [locationPermission, phoneStatePermission]);
+
   // Monitor network state
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -151,8 +204,42 @@ export default function MapScreen() {
     return () => unsubscribe();
   }, []);
 
-  const networkType = getNetworkType(networkState?.type || null);
-  const networkColor = NETWORK_COLORS[networkType as keyof typeof NETWORK_COLORS] || NETWORK_COLORS.unknown;
+  const rawNetworkLabel =
+    diagnostics?.netType ||
+    networkState?.details?.cellularGeneration ||
+    networkState?.type ||
+    null;
+  const networkCategory = getNetworkCategory(rawNetworkLabel);
+  const networkColor = NETWORK_COLORS[networkCategory] || NETWORK_COLORS.unknown;
+
+  // Build an nPerf-like trail: record points as we move with current network quality
+  useEffect(() => {
+    if (!location) return;
+
+    const category = networkCategory;
+    const { latitude, longitude } = location.coords;
+
+    // Skip if coordinates are obviously invalid
+    if (!latitude || !longitude) return;
+
+    setTrackPoints(prev => {
+      const next = [
+        ...prev,
+        {
+          id: `${Date.now()}-${prev.length}`,
+          latitude,
+          longitude,
+          category,
+          rsrp: diagnostics?.rsrp,
+        },
+      ];
+      // Keep last 500 points to avoid unbounded growth
+      if (next.length > 500) {
+        return next.slice(next.length - 500);
+      }
+      return next;
+    });
+  }, [location, networkCategory, diagnostics?.rsrp]);
 
   return (
     <View style={styles.container}>
@@ -196,8 +283,13 @@ export default function MapScreen() {
           <Text style={styles.infoTitle}>Network Technology</Text>
           <View style={styles.infoRow}>
             <View style={[styles.networkIndicator, { backgroundColor: networkColor }]} />
-            <Text style={styles.infoValue}>{networkType}</Text>
+            <Text style={styles.infoValue}>{networkCategory}</Text>
           </View>
+          {diagnostics?.netType && (
+            <Text style={styles.infoSubtext}>
+              Reported: {diagnostics.netType}
+            </Text>
+          )}
           {networkState?.details?.cellularGeneration && (
             <Text style={styles.infoSubtext}>
               Generation: {networkState.details.cellularGeneration}
@@ -220,7 +312,13 @@ export default function MapScreen() {
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Serving Site</Text>
           <Text style={styles.infoSubtext}>
-            Site ID: {networkState?.details?.cellId || 'N/A'}
+            Site ID (eNB): {diagnostics?.enb || 'N/A'}
+          </Text>
+          <Text style={styles.infoSubtext}>
+            Cell ID: {diagnostics?.cellId || networkState?.details?.cellId || 'N/A'}
+          </Text>
+          <Text style={styles.infoSubtext}>
+            RSRP: {diagnostics?.rsrp ? `${diagnostics.rsrp} dBm` : 'N/A'}
           </Text>
           {networkState?.details?.carrier && (
             <Text style={styles.infoSubtext}>
@@ -271,6 +369,27 @@ export default function MapScreen() {
                 />
                 </PointAnnotation>
             )}
+
+            {/* Coverage trail markers (nPerf-style dots) */}
+            {trackPoints.map(point => (
+              <PointAnnotation
+                key={point.id}
+                id={point.id}
+                coordinate={[point.longitude, point.latitude]}
+              >
+                <View
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 7,
+                    backgroundColor: NETWORK_COLORS[point.category],
+                    borderWidth: 1,
+                    borderColor: 'white',
+                    opacity: 0.9,
+                  }}
+                />
+              </PointAnnotation>
+            ))}
               
             {/* Region markers */}
             {ETHIO_TELECOM_REGIONS.map((region, index) => (
