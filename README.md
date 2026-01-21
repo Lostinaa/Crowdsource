@@ -50,3 +50,4 @@ npm start
 - **Mobile**: React Native, Expo, TypeScript
 - **Infrastructure**: Docker (PostgreSQL)
 
+

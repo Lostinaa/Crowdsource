@@ -19,3 +19,4 @@ class ViewQoeMetric extends ViewRecord
     }
 }
 
+

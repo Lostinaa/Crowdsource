@@ -19,3 +19,4 @@ class EditQoeMetric extends EditRecord
     }
 }
 
+
