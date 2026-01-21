@@ -37,6 +37,7 @@ pids
 .env
 .env.local
 .env.*.local
+.env*.local
 
 # Temporary files
 *.tmp
@@ -76,3 +77,30 @@ Crowdsource/*.tsbuildinfo
 Crowdsource/ios/
 Crowdsource/android/
 
+# Root level dependencies (for files added from my-new-branch)
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.tsbuildinfo
+*.pem
+
+# Generated native folders (root level)
+/ios
+/android
+
+# Android assets (build artifacts)
+android-assets/
+android-release/
