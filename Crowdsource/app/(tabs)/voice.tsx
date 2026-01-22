@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Button, Alert, Platform, PermissionsAndroid, Sc
 import { useEffect, useState, useRef } from 'react';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
+import BrandedButton from '../../src/components/BrandedButton';
 import CallMetrics, {
   CallStateChangePayload,
   CallDisconnectModule,
@@ -288,20 +289,19 @@ export default function VoiceScreen() {
       </View>
 
       <View style={styles.buttonsRow}>
-        <TouchableOpacity
-          style={[styles.button, isListening && styles.buttonDisabled]}
+        <BrandedButton
+          title="Start listener"
           onPress={handleStart}
           disabled={isListening}
-        >
-          <Text style={styles.buttonText}>Start listener</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonSecondary, !isListening && styles.buttonDisabled]}
+          style={{ flex: 1 }}
+        />
+        <BrandedButton
+          title="Stop listener"
           onPress={handleStop}
           disabled={!isListening}
-        >
-          <Text style={styles.buttonText}>Stop listener</Text>
-        </TouchableOpacity>
+          variant="outline"
+          style={{ flex: 1 }}
+        />
       </View>
 
       <View style={styles.metricsBox}>

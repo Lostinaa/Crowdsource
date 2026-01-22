@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, TextInput, Platform } from 'react-native';
+import BrandedButton from '../../src/components/BrandedButton';
 import { useState, useEffect } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -485,29 +486,28 @@ const syncToBackend = async () => {
             />
           </View>
           <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.button, styles.buttonSecondary]}
+            <BrandedButton
+              title="Save Settings"
               onPress={saveBackendSettings}
-            >
-              <Text style={styles.buttonText}>Save Settings</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.buttonSecondary]}
+              variant="outline"
+              style={{ flex: 1 }}
+            />
+            <BrandedButton
+              title="Test Connection"
               onPress={testBackendConnection}
               disabled={isSyncing}
-            >
-              <Text style={styles.buttonText}>Test Connection</Text>
-            </TouchableOpacity>
+              loading={isSyncing}
+              variant="outline"
+              style={{ flex: 1 }}
+            />
           </View>
-          <TouchableOpacity
-            style={[styles.button, styles.buttonPrimary]}
+          <BrandedButton
+            title={isSyncing ? 'Syncing...' : 'Sync Now'}
             onPress={syncToBackend}
             disabled={isSyncing || !backendUrl}
-          >
-            <Text style={styles.buttonText}>
-              {isSyncing ? 'Syncing...' : 'Sync Now'}
-            </Text>
-          </TouchableOpacity>
+            loading={isSyncing}
+            style={{ marginTop: theme.spacing.sm }}
+          />
           {syncStatus ? (
             <Text style={styles.syncStatus}>{syncStatus}</Text>
           ) : null}

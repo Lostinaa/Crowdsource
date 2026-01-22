@@ -1,6 +1,6 @@
-// Great Run Brand Theme (Company Standard)
+// Company Brand Theme (Adapted from Great-Run)
 export const theme = {
-  // Brand color
+  // Brand color - Company green
   brand: "#8ec63f", // Brand green color
 
   // Primary gradient colors - using brand color
@@ -12,7 +12,7 @@ export const theme = {
 
   // Solid colors - using brand color as primary
   colors: {
-    primary: "#8ec63f", // Brand green color
+    primary: "#8ec63f", // Brand green color (Company standard)
     secondary: "#6db02f", // Darker green accent
     accent: "#a0d657", // Light green
     danger: "#EF4444", // Red for errors

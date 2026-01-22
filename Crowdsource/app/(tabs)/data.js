@@ -4,6 +4,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
 import SpeedTestWebView from '../../src/components/SpeedTestWebView';
+import BrandedButton from '../../src/components/BrandedButton';
 
 export default function DataScreen() {
   const { metrics, scores, addBrowsingSample, addStreamingSample, addHttpSample, addSocialSample, addFtpSample, addLatencySample } = useQoE();
@@ -895,15 +896,16 @@ export default function DataScreen() {
       {/* Browsing Metrics */}
        <View style={styles.section}>
         <Text style={styles.sectionTitle}>Do Full test</Text>
-         <Button 
+         <BrandedButton 
           title="Full test" 
           onPress={fulltest} 
           disabled={isTesting}
+          loading={isTesting}
         />
        </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Browsing</Text>
-        <Button 
+        <BrandedButton 
           title="Test Browsing" 
           onPress={() => {
             console.log('[Data] Test Browsing button pressed');
@@ -938,7 +940,7 @@ export default function DataScreen() {
       {/* Streaming Metrics */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Streaming</Text>
-        <Button 
+        <BrandedButton 
           title="Test Streaming" 
           onPress={() => {
             console.log('[Data] Test Streaming button pressed');
@@ -980,15 +982,17 @@ export default function DataScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>File Access (HTTP)</Text>
         <View style={styles.buttonRow}>
-          <Button 
+          <BrandedButton 
             title="Test Download" 
             onPress={testHttpDownload} 
             disabled={isTesting}
+            style={{ flex: 1 }}
           />
-          <Button 
+          <BrandedButton 
             title="Test Upload" 
             onPress={testHttpUpload} 
             disabled={isTesting}
+            style={{ flex: 1 }}
           />
         </View>
         <View style={styles.metricsBox}>
@@ -1031,7 +1035,7 @@ export default function DataScreen() {
       {/* Social Media Metrics */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Social Media</Text>
-        <Button 
+        <BrandedButton 
           title="Test Social Media" 
           onPress={testSocialMedia} 
           disabled={isTesting}
@@ -1064,15 +1068,17 @@ export default function DataScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>File Access (FTP)</Text>
         <View style={styles.buttonRow}>
-          <Button 
+          <BrandedButton 
             title="Test FTP Download" 
             onPress={testFtpDownload} 
             disabled={isTesting}
+            style={{ flex: 1 }}
           />
-          <Button 
+          <BrandedButton 
             title="Test FTP Upload" 
             onPress={testFtpUpload} 
             disabled={isTesting}
+            style={{ flex: 1 }}
           />
         </View>
         <View style={styles.metricsBox}>
@@ -1101,12 +1107,12 @@ export default function DataScreen() {
       {/* Latency & Interactivity Metrics */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Latency & Interactivity</Text>
-        <Button 
+        <BrandedButton 
           title="Test Interactivity" 
           onPress={() => {
             console.log('[Data] Test Interactivity button pressed');
             testLatency();
-          }} 
+          }}
           disabled={isTesting}
         />
         <View style={styles.metricsBox}>
