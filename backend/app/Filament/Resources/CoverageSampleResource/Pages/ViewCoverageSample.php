@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Filament\Resources\QoeMetricResource\Pages;
+namespace App\Filament\Resources\CoverageSampleResource\Pages;
 
-use App\Filament\Resources\QoeMetricResource;
+use App\Filament\Resources\CoverageSampleResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 
-class ViewQoeMetric extends ViewRecord
+class ViewCoverageSample extends ViewRecord
 {
-    protected static string $resource = QoeMetricResource::class;
+    protected static string $resource = CoverageSampleResource::class;
 
     protected function getHeaderActions(): array
     {
@@ -18,10 +18,3 @@ class ViewQoeMetric extends ViewRecord
         ];
     }
 }
-
-
-
-
-
-
-

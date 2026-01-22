@@ -31,8 +31,16 @@ export default function SettingsScreen() {
           AsyncStorage.getItem(BACKEND_API_KEY),
           AsyncStorage.getItem(AUTO_SYNC_KEY),
         ]);
-        // Use saved URL or default to local backend
-        const backendUrlToUse = url || 'http://10.72.71.72:8000/api';
+        // Use saved URL or auto-detect based on device type
+        // For emulator: 10.0.2.2, for real device: actual IP
+        const getDefaultUrl = () => {
+          if (Platform.OS === 'android' && !Device.isDevice) {
+            return 'http://10.0.2.2:8000/api'; // Android emulator
+          }
+          return 'http://172.25.210.174:8000/api'; // Real device
+        };
+        const backendUrlToUse = url || getDefaultUrl();
+        console.log('[Settings] Loading backend URL:', backendUrlToUse, url ? '(from storage)' : '(auto-detected)');
         setBackendUrl(backendUrlToUse);
         backendApi.setBackendUrl(backendUrlToUse);
         if (key) {
@@ -125,7 +133,7 @@ export default function SettingsScreen() {
           mimeType: 'text/csv',
           dialogTitle: 'Export QoE Data',
         });
-        Alert.alert('Success', 'Data exported to CSV successfully!');
+        Alert.alert('Success', 'Data exported to CSV successfully !');
       } else {
         Alert.alert('Error', 'Sharing is not available on this device');
       }
@@ -435,6 +443,27 @@ const syncToBackend = async () => {
             autoCapitalize="none"
             autoCorrect={false}
           />
+          <TouchableOpacity
+            style={[styles.button, styles.buttonSecondary, { marginTop: 8, marginBottom: 8, padding: 8 }]}
+            onPress={async () => {
+              const getDefaultUrl = () => {
+                if (Platform.OS === 'android' && !Device.isDevice) {
+                  return 'http://10.0.2.2:8000/api'; // Android emulator
+                }
+                return 'http://172.25.210.174:8000/api'; // Real device
+              };
+              const defaultUrl = getDefaultUrl();
+              setBackendUrl(defaultUrl);
+              backendApi.setBackendUrl(defaultUrl);
+              await AsyncStorage.removeItem(BACKEND_URL_KEY);
+              Alert.alert('Reset', `Backend URL reset to auto-detected: ${defaultUrl}`);
+            }}
+          >
+            <Text style={[styles.buttonText, { fontSize: 12 }]}>Reset to Auto-Detect</Text>
+          </TouchableOpacity>
+          <Text style={[styles.inputLabel, { fontSize: 12, fontWeight: '400', marginTop: 4, marginBottom: 8 }]}>
+            Current: {Platform.OS === 'android' && !Device.isDevice ? 'Emulator (10.0.2.2)' : 'Real Device (172.25.210.174)'}
+          </Text>
           <Text style={styles.inputLabel}>API Key (Optional)</Text>
           <TextInput
             style={styles.input}

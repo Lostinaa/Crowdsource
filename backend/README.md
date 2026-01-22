@@ -65,8 +65,20 @@ If you prefer manual setup:
 
 8. **Start server**:
    ```bash
+   # For emulator/development (localhost only)
    php artisan serve
+   
+   # For real devices (network accessible)
+   php artisan serve --host=0.0.0.0 --port=8000
+   # Or use the convenience script:
+   ./start-server.sh
    ```
+
+**Important for Real Device Connection:**
+- Use `--host=0.0.0.0` to bind to all network interfaces
+- Find your machine's IP: `hostname -I` (Linux) or `ipconfig getifaddr en0` (Mac)
+- Update mobile app backend URL to: `http://YOUR_IP:8000/api`
+- Ensure both device and computer are on the same network
 
 ## API Endpoints
 
@@ -80,6 +92,9 @@ If you prefer manual setup:
 ## Frontend Configuration
 
 Update your React Native app's backend URL:
-- Development: `http://localhost:8000/api`
-- Production: `https://your-domain.com/api`
+- **Emulator**: `http://localhost:8000/api` or `http://10.0.2.2:8000/api` (Android emulator)
+- **Real Device**: `http://YOUR_COMPUTER_IP:8000/api` (e.g., `http://172.25.210.174:8000/api`)
+- **Production**: `https://your-domain.com/api`
+
+You can configure this in the app's Settings screen under "Backend Sync" section.
 

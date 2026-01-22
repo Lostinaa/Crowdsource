@@ -3,7 +3,31 @@
  * Handles secure data transmission to backend analytics platform
  */
 
-const DEFAULT_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://192.168.1.5:8000/api';
+import * as Device from 'expo-device';
+import { Platform } from 'react-native';
+
+// Auto-detect backend URL based on platform
+const getDefaultBackendUrl = () => {
+  // Check environment variable first
+  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
+    return process.env.EXPO_PUBLIC_BACKEND_URL;
+  }
+  
+  // For Android emulator, use 10.0.2.2 (special IP that maps to host's localhost)
+  if (Platform.OS === 'android' && !Device.isDevice) {
+    return 'http://10.0.2.2:8000/api';
+  }
+  
+  // For real devices, use the actual IP address
+  // Default to the current machine's IP (update this if your IP changes)
+  return 'http://172.25.210.174:8000/api';
+};
+
+const DEFAULT_BACKEND_URL = getDefaultBackendUrl();
+
+// Log the detected URL for debugging
+console.log('[BackendAPI] Initialized with URL:', DEFAULT_BACKEND_URL, 
+  Platform.OS === 'android' && !Device.isDevice ? '(Android Emulator)' : '(Real Device)');
 
 class BackendApiClient {
   constructor(baseUrl = DEFAULT_BACKEND_URL, apiKey = null) {
@@ -11,6 +35,7 @@ class BackendApiClient {
     this.apiKey = apiKey;
     this.syncQueue = [];
     this.isSyncing = false;
+    console.log('[BackendAPI] BackendApiClient created with baseUrl:', this.baseUrl);
   }
 
   /**
@@ -24,6 +49,7 @@ class BackendApiClient {
    * Set backend URL
    */
   setBackendUrl(url) {
+    console.log('[BackendAPI] URL changed from', this.baseUrl, 'to', url);
     this.baseUrl = url;
   }
 
@@ -138,6 +164,7 @@ class BackendApiClient {
     };
 
     try {
+      console.log('[BackendAPI] Sending metrics to:', `${this.baseUrl}/metrics`);
       const response = await fetch(`${this.baseUrl}/metrics`, {
         method: 'POST',
         headers: this.getHeaders(),
@@ -151,7 +178,7 @@ class BackendApiClient {
       const result = await response.json();
       return { success: true, data: result };
     } catch (error) {
-      console.error('[BackendAPI] Failed to send metrics:', error);
+      console.error('[BackendAPI] Failed to send metrics:', error.message, 'URL:', this.baseUrl);
       // Queue for retry
       this.syncQueue.push({ type: 'metrics', payload, timestamp: Date.now() });
       return { success: false, error: error.message };
@@ -194,7 +221,7 @@ class BackendApiClient {
 
       return { success: true, data: await response.json() };
     } catch (error) {
-      console.error('[BackendAPI] Failed to send coverage sample:', error);
+      console.error('[BackendAPI] Failed to send coverage sample:', error.message, 'URL:', this.baseUrl);
       this.syncQueue.push({ type: 'coverage', payload, timestamp: Date.now(), retryCount: 0 });
       return { success: false, error: error.message };
     }
@@ -210,6 +237,70 @@ class BackendApiClient {
       deviceInfo,
       location
     );
+  }
+
+  /**
+   * Get coverage samples from backend
+   */
+  async getCoverageSamples(filters = {}) {
+    try {
+      const params = new URLSearchParams();
+      if (filters.startDate) params.append('start_date', filters.startDate);
+      if (filters.endDate) params.append('end_date', filters.endDate);
+      if (filters.networkCategory) params.append('network_category', filters.networkCategory);
+      if (filters.limit) params.append('limit', filters.limit);
+      if (filters.bounds) {
+        params.append('bounds[min_lat]', filters.bounds.minLat);
+        params.append('bounds[max_lat]', filters.bounds.maxLat);
+        params.append('bounds[min_lon]', filters.bounds.minLon);
+        params.append('bounds[max_lon]', filters.bounds.maxLon);
+      }
+
+      const url = `${this.baseUrl}/coverage-samples${params.toString() ? '?' + params.toString() : ''}`;
+      console.log('[BackendAPI] Fetching coverage samples:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Backend API error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      return { success: true, data: result.data || [], count: result.count || 0 };
+    } catch (error) {
+      console.error('[BackendAPI] Failed to get coverage samples:', error.message);
+      return { success: false, error: error.message, data: [], count: 0 };
+    }
+  }
+
+  /**
+   * Get coverage statistics
+   */
+  async getCoverageStatistics(filters = {}) {
+    try {
+      const params = new URLSearchParams();
+      if (filters.startDate) params.append('start_date', filters.startDate);
+      if (filters.endDate) params.append('end_date', filters.endDate);
+
+      const url = `${this.baseUrl}/coverage-samples/statistics${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Backend API error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      return { success: true, data: result.data || {} };
+    } catch (error) {
+      console.error('[BackendAPI] Failed to get coverage statistics:', error.message);
+      return { success: false, error: error.message, data: {} };
+    }
   }
 
   /**
@@ -247,22 +338,26 @@ class BackendApiClient {
    * Test backend connection
    */
   async testConnection() {
+    console.log('[BackendAPI] Testing connection to:', this.baseUrl);
     try {
       const response = await fetch(`${this.baseUrl}/health`, {
         method: 'GET',
         headers: this.getHeaders(),
       });
 
+      console.log('[BackendAPI] Health check response:', response.status, response.statusText);
+      
       return {
         success: response.ok,
         status: response.status,
-        message: response.ok ? 'Connection successful' : `Connection failed: ${response.statusText}`,
+        message: response.ok ? 'Connection successful' : `Connection failed: ${response.status} ${response.statusText}`,
       };
     } catch (error) {
+      console.error('[BackendAPI] Connection test error:', error.message, 'URL:', this.baseUrl);
       return {
         success: false,
         error: error.message,
-        message: `Connection failed: ${error.message}`,
+        message: `Connection failed: ${error.message} (URL: ${this.baseUrl})`,
       };
     }
   }

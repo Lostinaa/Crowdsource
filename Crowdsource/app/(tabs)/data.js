@@ -3,11 +3,19 @@ import { useState, useEffect } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
+import SpeedTestWebView from '../../src/components/SpeedTestWebView';
 
 export default function DataScreen() {
   const { metrics, scores, addBrowsingSample, addStreamingSample, addHttpSample, addSocialSample, addFtpSample, addLatencySample } = useQoE();
   const [isTesting, setIsTesting] = useState(false);
   const [networkState, setNetworkState] = useState(null);
+  const [webViewVisible, setWebViewVisible] = useState(false);
+  const [webViewTestType, setWebViewTestType] = useState(null);
+
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log('[Data] WebView state changed:', { webViewVisible, webViewTestType });
+  }, [webViewVisible, webViewTestType]);
 
   // Check network connectivity
   useEffect(() => {
@@ -44,31 +52,37 @@ export default function DataScreen() {
     return `${kbps.toFixed(2)} Kbps`;
   };
 
-  // Real browsing test with actual HTTP request
-  const testBrowsing = async () => {
-    if (isTesting) return;
+  // Browsing test with WebView (nPerf-style)
+  const testBrowsing = async (silent = false) => {
+    if (isTesting && !silent) return;
     
     // Check network connectivity first
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      if (!silent) {
+        Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      }
       return;
     }
     
-    setIsTesting(true);
+    if (!silent) {
+      // Open WebView modal for visual test
+      console.log('[Data] Opening WebView for browsing test');
+      setWebViewTestType('browsing');
+      setWebViewVisible(true);
+      return;
+    }
     
+    // Silent mode: run background test
+    setIsTesting(true);
     const startTime = Date.now();
     addBrowsingSample({ request: true });
 
     try {
-      // Test URL - using a lightweight page for testing
       const testUrl = 'https://www.google.com/favicon.ico';
-      
-      // Create AbortController for timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       
-      // Measure DNS resolution + connection time (time to first byte)
       const dnsStart = Date.now();
       const response = await fetch(testUrl, {
         method: 'GET',
@@ -78,28 +92,16 @@ export default function DataScreen() {
       clearTimeout(timeoutId);
       const dnsTime = Date.now() - dnsStart;
 
-      // Measure download time and throughput
       const downloadStart = Date.now();
       const blob = await response.blob();
       const downloadTime = Date.now() - downloadStart;
       const duration = Date.now() - startTime;
 
-      // Calculate throughput (Kbps)
       const sizeBytes = blob.size;
-      // Use Math.max to ensure we never divide by 0, and use at least 1ms
-      // For very fast downloads, use total duration as fallback
       const effectiveTime = Math.max(downloadTime, duration, 1);
       const throughputKbps = sizeBytes > 0 && effectiveTime > 0
-        ? (sizeBytes * 8 * 1000) / effectiveTime // Convert bytes to bits, then ms to seconds, then to Kbps
+        ? (sizeBytes * 8 * 1000) / effectiveTime
         : 0;
-      
-      console.log('[Data] Browsing throughput calc:', {
-        sizeBytes,
-        downloadTime,
-        duration,
-        effectiveTime,
-        throughputKbps,
-      });
 
       if (response.ok) {
         addBrowsingSample({
@@ -108,23 +110,49 @@ export default function DataScreen() {
           dnsResolutionTimeMs: dnsTime,
           throughputKbps: throughputKbps,
         });
-
-        Alert.alert('Success', `Browsing test completed in ${(duration / 1000).toFixed(2)}s\nThroughput: ${(throughputKbps / 1000).toFixed(2)} Mbps`);
-      } else {
-        throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
       console.error('[Data] Browsing test error:', error);
-      let errorMsg = error.message;
-      if (error.name === 'AbortError') {
-        errorMsg = 'Request timed out. Check your internet connection.';
-      } else if (error.message === 'Network request failed') {
-        errorMsg = 'Network request failed. Check your internet connection.';
-      }
-      Alert.alert('Error', `Browsing test failed: ${errorMsg}`);
     } finally {
       setIsTesting(false);
     }
+  };
+
+  // Handle WebView test completion
+  const handleWebViewTestComplete = (result) => {
+    if (webViewTestType === 'browsing') {
+      addBrowsingSample({
+        request: true,
+        completed: result.success,
+        durationMs: result.duration,
+        dnsResolutionTimeMs: result.dnsTime,
+      });
+      if (result.success) {
+        Alert.alert('Success', `Browsing test completed in ${(result.duration / 1000).toFixed(2)}s`);
+      }
+    } else if (webViewTestType === 'video') {
+      addStreamingSample({
+        request: true,
+        completed: result.success,
+        setupTimeMs: result.duration,
+      });
+      if (result.success) {
+        Alert.alert('Success', `Video test completed in ${(result.duration / 1000).toFixed(2)}s`);
+      }
+    } else if (webViewTestType === 'latency') {
+      // Calculate interactivity score from latency
+      const latencyScore = result.duration < 100 ? 100 : Math.max(0, 100 - ((result.duration - 100) / 9));
+      addLatencySample({
+        request: true,
+        completed: result.success,
+        score: Math.round(latencyScore),
+      });
+      if (result.success) {
+        Alert.alert('Success', `Latency: ${result.duration}ms`);
+      }
+    }
+    setWebViewVisible(false);
+    setWebViewTestType(null);
   };
   const fulltest = async () => {
     if (isTesting) return;
@@ -157,13 +185,23 @@ export default function DataScreen() {
   };
 
   // Real streaming test with actual video/audio streaming
-  const testStreaming = async () => {
-    if (isTesting) return;
+  const testStreaming = async (silent = false) => {
+    if (isTesting && !silent) return;
     
     // Check network connectivity first
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      if (!silent) {
+        Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      }
+      return;
+    }
+    
+    if (!silent) {
+      // Open WebView modal for visual video test
+      console.log('[Data] Opening WebView for video streaming test');
+      setWebViewTestType('video');
+      setWebViewVisible(true);
       return;
     }
     
@@ -748,12 +786,22 @@ export default function DataScreen() {
   };
 
   // Latency & Interactivity test
-  const testLatency = async () => {
-    if (isTesting) return;
+  const testLatency = async (silent = false) => {
+    if (isTesting && !silent) return;
     
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      if (!silent) {
+        Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      }
+      return;
+    }
+    
+    if (!silent) {
+      // Open WebView modal for visual latency test
+      console.log('[Data] Opening WebView for latency test');
+      setWebViewTestType('latency');
+      setWebViewVisible(true);
       return;
     }
     
@@ -822,6 +870,7 @@ export default function DataScreen() {
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <Text style={styles.title}>Data QoE</Text>
       <Text style={styles.subtitle}>
@@ -856,7 +905,10 @@ export default function DataScreen() {
         <Text style={styles.sectionTitle}>Browsing</Text>
         <Button 
           title="Test Browsing" 
-          onPress={testBrowsing} 
+          onPress={() => {
+            console.log('[Data] Test Browsing button pressed');
+            testBrowsing();
+          }} 
           disabled={isTesting}
         />
         <View style={styles.metricsBox}>
@@ -888,7 +940,10 @@ export default function DataScreen() {
         <Text style={styles.sectionTitle}>Streaming</Text>
         <Button 
           title="Test Streaming" 
-          onPress={testStreaming} 
+          onPress={() => {
+            console.log('[Data] Test Streaming button pressed');
+            testStreaming();
+          }} 
           disabled={isTesting}
         />
         <View style={styles.metricsBox}>
@@ -1048,7 +1103,10 @@ export default function DataScreen() {
         <Text style={styles.sectionTitle}>Latency & Interactivity</Text>
         <Button 
           title="Test Interactivity" 
-          onPress={testLatency} 
+          onPress={() => {
+            console.log('[Data] Test Interactivity button pressed');
+            testLatency();
+          }} 
           disabled={isTesting}
         />
         <View style={styles.metricsBox}>
@@ -1088,8 +1146,21 @@ export default function DataScreen() {
         <Text style={styles.coverageText}>
           Coverage: {formatPercent(scores.data.appliedWeight)}
       </Text>
-    </View>
+      </View>
     </ScrollView>
+
+    {/* WebView Speed Test Modal */}
+    <SpeedTestWebView
+      visible={webViewVisible}
+      onClose={() => {
+        console.log('[Data] Closing WebView');
+        setWebViewVisible(false);
+        setWebViewTestType(null);
+      }}
+      testType={webViewTestType}
+      onTestComplete={handleWebViewTestComplete}
+    />
+  </View>
   );
 }
 

@@ -30,7 +30,8 @@
     "react-native-maps": "^1.26.20",
     "react-native-safe-area-context": "latest",
     "react-native-screens": "~4.16.0",
-    "react-native-web": "^0.21.0"
+    "react-native-web": "^0.21.0",
+    "react-native-webview": "13.15.0"
   },
   "private": true
 }

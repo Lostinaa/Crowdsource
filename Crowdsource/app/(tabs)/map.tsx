@@ -71,6 +71,8 @@ export default function MapScreen() {
       rsrp?: string;
     }[]
   >([]);
+  const [historicalSamples, setHistoricalSamples] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [currentRegion, setCurrentRegion] = useState<string>('Unknown');
   const [mapError, setMapError] = useState(false);
   const cameraRef = useRef<any>(null);
@@ -244,6 +246,43 @@ export default function MapScreen() {
     });
   }, [location, networkCategory, diagnostics?.rsrp]);
 
+  // Load historical coverage samples from backend when map screen loads
+  useEffect(() => {
+    const loadHistoricalSamples = async () => {
+      setIsLoadingHistory(true);
+      try {
+        // Load last 1000 samples from the last 7 days
+        const endDate = new Date().toISOString();
+        const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        
+        const result = await backendApi.getCoverageSamples({
+          startDate,
+          endDate,
+          limit: 1000,
+        });
+
+        if (result.success && result.data) {
+          console.log('[Map] Loaded', result.count, 'historical coverage samples');
+          // Convert backend samples to track points format
+          const samples = result.data.map((sample: any) => ({
+            id: `historical-${sample.id}`,
+            latitude: parseFloat(sample.latitude),
+            longitude: parseFloat(sample.longitude),
+            category: (sample.network_category || 'unknown') as keyof typeof NETWORK_COLORS,
+            rsrp: sample.rsrp,
+          }));
+          setHistoricalSamples(samples);
+        }
+      } catch (error) {
+        console.warn('[Map] Failed to load historical samples:', error);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadHistoricalSamples();
+  }, []); // Load once when component mounts
+
   // Push latest point to backend (fire-and-forget)
   useEffect(() => {
     if (!trackPoints.length) return;
@@ -410,7 +449,28 @@ export default function MapScreen() {
                 </PointAnnotation>
             )}
 
-            {/* Coverage trail markers (nPerf-style dots) */}
+            {/* Historical coverage samples from backend */}
+            {historicalSamples.map(point => (
+              <PointAnnotation
+                key={point.id}
+                id={point.id}
+                coordinate={[point.longitude, point.latitude]}
+              >
+                <View
+                  style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: 6,
+                    backgroundColor: NETWORK_COLORS[point.category],
+                    borderWidth: 1,
+                    borderColor: 'white',
+                    opacity: 0.7,
+                  }}
+                />
+              </PointAnnotation>
+            ))}
+            
+            {/* Current session coverage trail markers (nPerf-style dots) */}
             {trackPoints.map(point => (
               <PointAnnotation
                 key={point.id}

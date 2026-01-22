@@ -11,7 +11,7 @@ return [
         'http://localhost:19000', // Expo alternative port
         'http://127.0.0.1:8081',
         'http://127.0.0.1:19006',
-        env('FRONTEND_URL', '*'),
+        env('FRONTEND_URL', '*'), // Allow all origins for mobile apps
     ],
 
     'allowed_origins_patterns' => [],

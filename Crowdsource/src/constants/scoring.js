@@ -1,41 +1,50 @@
+// Voice weights per QoE Calculator table (25% + 25% + 15% + 10% + 15% + 10% = 100%)
 export const VOICE_WEIGHTS = {
-  cssr: 0.3125,
-  cdr: 0.375,
-  cstAvg: 0.0625,
-  cstOver15: 0.0875,
-  cstP10: 0.0375,
-  mosAvg: 0.0438,
-  mosUnder16: 0.0562,
-  mosP90: 0.025,
+  cssr: 0.25,        // Call Setup Success Ratio: 25% of voice
+  cdr: 0.25,         // Call Drop Ratio: 25% of voice
+  mosAvg: 0.15,      // MOS: 15% of voice
+  mosUnder16: 0.10,  // MOS < 1.6: 10% of voice
+  cstAvg: 0.15,      // Call Setup Time [s]: 15% of voice
+  cstOver15: 0.10,   // Call Setup Time > 10s: 10% of voice (using >15s threshold)
+  cstP10: 0.0,       // Not in calculator table
+  mosP90: 0.0,       // Not in calculator table
 };
 
 export const DATA_WEIGHTS = {
+  // Data Testing (HTTP/FTP) - 30% of data component
   http: {
-    successRatio: 0.055,
-    dlAvg: 0.035,
-    dlP10: 0.045,
-    dlP90: 0.0175,
-    ulAvg: 0.035,
-    ulP10: 0.045,
-    ulP90: 0.0175,
-  }, // sums to 0.25
+    successRatio: 0.03,      // 10% of 30% = 3% of data
+    dlAvg: 0.042,            // 14% of 30% = 4.2% of data
+    dlP10: 0.054,            // 18% of 30% = 5.4% of data
+    dlP90: 0.024,            // 8% of 30% = 2.4% of data
+    ulAvg: 0.042,            // 14% of 30% = 4.2% of data
+    ulP10: 0.054,            // 18% of 30% = 5.4% of data
+    ulP90: 0.024,            // 8% of 30% = 2.4% of data
+  }, // sums to 0.30 (30% of data)
+  // Browsing - 25% of data component
   browsing: {
-    successRatio: 0.25333,
-    durationAvg: 0.10857,
-    durationOver6: 0.0181,
-  }, // 0.38
+    successRatio: 0.125,     // 50% of 25% = 12.5% of data
+    durationAvg: 0.125,      // 50% of 25% = 12.5% of data
+  }, // sums to 0.25 (25% of data)
+  // Video Streaming - 15% of data component
   streaming: {
-    successRatio: 0.1276,
-    mosAvg: 0.0363,
-    mosP10: 0.0363,
-    setupAvg: 0.0099,
-    setupOver10: 0.0099,
-  }, // 0.22
+    successRatio: 0.075,     // 50% of 15% = 7.5% of data
+    mosAvg: 0.0225,           // 15% of 15% = 2.25% of data (Video Quality MOS)
+    mosUnder38: 0.015,        // 10% of 15% = 1.5% of data (Video MOS < 3.8)
+    setupAvg: 0.0225,         // 15% of 15% = 2.25% of data (Video Access Time [s])
+    setupOver5: 0.015,        // 10% of 15% = 1.5% of data (Video Access Time > 5s)
+  }, // sums to 0.15 (15% of data)
+  // Social Media - 15% of data component
   social: {
-    successRatio: 0.100005,
-    durationAvg: 0.042855,
-    durationOver15: 0.00714,
-  }, // 0.15
+    successRatio: 0.075,     // 50% of 15% = 7.5% of data
+    durationAvg: 0.045,      // 30% of 15% = 4.5% of data
+    durationOver5: 0.03,     // 20% of 15% = 3% of data (Activity Duration > 5s)
+  }, // sums to 0.15 (15% of data)
+  // Latency and Interactivity - 15% of data component
+  latency: {
+    successRatio: 0.075,     // 50% of 15% = 7.5% of data
+    avgScore: 0.075,         // 50% of 15% = 7.5% of data
+  }, // sums to 0.15 (15% of data)
 };
 
 export const OVERALL_WEIGHTS = {
@@ -64,21 +73,25 @@ export const THRESHOLDS = {
     ulP90: { good: 100, bad: 5, higherIsBetter: true },
   },
   browsing: {
-    successRatio: { good: 1.0, bad: 0.8, higherIsBetter: true },
-    durationAvg: { good: 1.0, bad: 6.0, higherIsBetter: false },
-    durationOver6: { good: 0.0, bad: 0.15, higherIsBetter: false },
+    successRatio: { good: 1.0, bad: 0.8, higherIsBetter: true }, // Activity Success Ratio: 80% bad, 100% good
+    durationAvg: { good: 0.0, bad: 3.0, higherIsBetter: false }, // Average Duration [s]: 3 bad, 0 good
+    durationOver6: { good: 0.0, bad: 0.15, higherIsBetter: false }, // Not in calculator, keeping for compatibility
   },
   streaming: {
-    successRatio: { good: 1.0, bad: 0.8, higherIsBetter: true },
-    mosAvg: { good: 4.5, bad: 3.0, higherIsBetter: true },
-    mosP10: { good: 4.0, bad: 2.0, higherIsBetter: true },
-    setupAvg: { good: 2.0, bad: 7.0, higherIsBetter: false },
-    setupOver10: { good: 0.0, bad: 0.05, higherIsBetter: false },
+    successRatio: { good: 1.0, bad: 0.8, higherIsBetter: true }, // 80% bad, 100% good
+    mosAvg: { good: 5.0, bad: 3.5, higherIsBetter: true }, // Video Quality MOS: 3.5 bad, 5 good
+    mosP10: { good: 4.0, bad: 2.0, higherIsBetter: true }, // Not in calculator, keeping for compatibility
+    setupAvg: { good: 0.0, bad: 5.0, higherIsBetter: false }, // Video Access Time [s]: 5 bad, 0 good
+    setupOver10: { good: 0.0, bad: 0.10, higherIsBetter: false }, // Video Access Time > 5s: 10% bad, 0% good
   },
   social: {
-    successRatio: { good: 1.0, bad: 0.8, higherIsBetter: true },
-    durationAvg: { good: 3.0, bad: 15.0, higherIsBetter: false },
-    durationOver15: { good: 0.0, bad: 0.05, higherIsBetter: false },
+    successRatio: { good: 1.0, bad: 0.8, higherIsBetter: true }, // Activity Success Ratio (upload duration < 15s): 80% bad, 100% good
+    durationAvg: { good: 0.0, bad: 5.0, higherIsBetter: false }, // Average Duration [s]: 5 bad, 0 good
+    durationOver5: { good: 0.0, bad: 0.10, higherIsBetter: false }, // Activity Duration > 5s: 10% bad, 0% good
+  },
+  latency: {
+    successRatio: { good: 1.0, bad: 0.8, higherIsBetter: true }, // Interactivity Success Ratio (Score > 25)
+    avgScore: { good: 100, bad: 25, higherIsBetter: true }, // Average Interactivity Score
   },
 };
 

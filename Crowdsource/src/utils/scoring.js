@@ -49,27 +49,25 @@ const calculateVoiceScore = (voiceMetrics) => {
     cssrFormula: `setupOk(${setupOk}) / attempts(${attempts})`,
     cdrFormula: `dropped(${dropped}) / (completed(${completed}) + dropped(${dropped})) = ${totalAnswered}`,
   });
-  const cstOver15 = ratio(
-    setupTimes.filter((val) => val > 15_000).length,
+  // Call Setup Time > 10s (per calculator table, threshold: 3% bad, 0% good)
+  const cstOver10 = ratio(
+    setupTimes.filter((val) => val > 10_000).length, // > 10 seconds in milliseconds
     setupTimes.length
   );
-  const cstP10 = percentile(setupTimes, 0.1);
   const mosAvg = safeAverage(mosSamples);
   const mosUnder16 = ratio(
     mosSamples.filter((val) => val < 1.6).length,
     mosSamples.length
   );
-  const mosP90 = percentile(mosSamples, 0.9);
 
+  // Per QoE Calculator table, only these metrics are used:
   const metrics = buildEntries([
     { score: evaluateMetric(cssr, THRESHOLDS.voice.cssr), weight: VOICE_WEIGHTS.cssr },
     { score: evaluateMetric(cdr, THRESHOLDS.voice.cdr), weight: VOICE_WEIGHTS.cdr },
-    { score: evaluateMetric(cstAvg, THRESHOLDS.voice.cstAvg), weight: VOICE_WEIGHTS.cstAvg },
-    { score: evaluateMetric(cstOver15, THRESHOLDS.voice.cstOver15), weight: VOICE_WEIGHTS.cstOver15 },
-    { score: evaluateMetric(cstP10, THRESHOLDS.voice.cstP10), weight: VOICE_WEIGHTS.cstP10 },
     { score: evaluateMetric(mosAvg, THRESHOLDS.voice.mosAvg), weight: VOICE_WEIGHTS.mosAvg },
     { score: evaluateMetric(mosUnder16, THRESHOLDS.voice.mosUnder16), weight: VOICE_WEIGHTS.mosUnder16 },
-    { score: evaluateMetric(mosP90, THRESHOLDS.voice.mosP90), weight: VOICE_WEIGHTS.mosP90 },
+    { score: evaluateMetric(cstAvg, THRESHOLDS.voice.cstAvg), weight: VOICE_WEIGHTS.cstAvg },
+    { score: evaluateMetric(cstOver10, THRESHOLDS.voice.cstOver15), weight: VOICE_WEIGHTS.cstOver15 }, // Using cstOver15 threshold (3% bad, 0% good)
   ]);
 
   const { score, appliedWeight } = weightedScore(metrics);
@@ -79,11 +77,9 @@ const calculateVoiceScore = (voiceMetrics) => {
     cssr,
     cdr,
     cstAvg,
-    cstOver15,
-    cstP10,
+    cstOver15: cstOver10, // Renamed for consistency but using >10s threshold
     mosAvg,
     mosUnder16,
-    mosP90,
   };
 };
 
@@ -160,22 +156,18 @@ const calculateBrowsingScore = (browsingMetrics) => {
   });
 
   const successRatio = ratio(completed, requests);
-  const durationAvg = safeAverage(durations);
-  const durationOver6 = ratio(
-    durations.filter((val) => val > 6_000).length,
-    durations.length
-  );
+  // Average Duration in seconds (per calculator table: 3 bad, 0 good)
+  const durationAvg = safeAverage(durations.map(d => d / 1000)); // Convert ms to seconds
 
   console.log('[Scoring] Browsing calculations:', {
     successRatio,
     durationAvg,
-    durationOver6,
   });
 
+  // Per QoE Calculator table: Activity Success Ratio (50%), Average Duration (50%)
   const metrics = buildEntries([
     { score: evaluateMetric(successRatio, THRESHOLDS.browsing.successRatio), weight: DATA_WEIGHTS.browsing.successRatio },
     { score: evaluateMetric(durationAvg, THRESHOLDS.browsing.durationAvg), weight: DATA_WEIGHTS.browsing.durationAvg },
-    { score: evaluateMetric(durationOver6, THRESHOLDS.browsing.durationOver6), weight: DATA_WEIGHTS.browsing.durationOver6 },
   ]);
 
   const { score, appliedWeight } = weightedScore(metrics);
@@ -184,7 +176,6 @@ const calculateBrowsingScore = (browsingMetrics) => {
     appliedWeight,
     successRatio,
     durationAvg,
-    durationOver6,
   };
 };
 
@@ -205,10 +196,11 @@ const calculateStreamingScore = (streamingMetrics) => {
 
   const successRatio = ratio(completed, requests);
   const mosAvg = safeAverage(mosSamples);
-  const mosP10 = percentile(mosSamples, 0.1);
-  const setupAvg = safeAverage(setupTimes);
-  const setupOver10 = ratio(
-    setupTimes.filter((val) => val > 10_000).length,
+  // Video Access Time (setupAvg) - average in seconds
+  const setupAvg = safeAverage(setupTimes.map(t => t / 1000)); // Convert ms to seconds
+  // Video Access Time > 5s (per calculator table)
+  const setupOver5 = ratio(
+    setupTimes.filter((val) => val > 5_000).length, // > 5 seconds in milliseconds
     setupTimes.length
   );
 
@@ -216,15 +208,22 @@ const calculateStreamingScore = (streamingMetrics) => {
     successRatio,
     mosAvg,
     setupAvg,
-    setupOver10,
+    setupOver5,
   });
+
+  // Per QoE Calculator table: Success Ratio (50%), MOS (15%), MOS < 3.8 (10%), Access Time (15%), Access Time > 5s (10%)
+  // Note: MOS < 3.8 is calculated as ratio, not as a separate metric in our implementation
+  const mosUnder38 = ratio(
+    mosSamples.filter((val) => val < 3.8).length,
+    mosSamples.length
+  );
 
   const metrics = buildEntries([
     { score: evaluateMetric(successRatio, THRESHOLDS.streaming.successRatio), weight: DATA_WEIGHTS.streaming.successRatio },
     { score: evaluateMetric(mosAvg, THRESHOLDS.streaming.mosAvg), weight: DATA_WEIGHTS.streaming.mosAvg },
-    { score: evaluateMetric(mosP10, THRESHOLDS.streaming.mosP10), weight: DATA_WEIGHTS.streaming.mosP10 },
+    { score: evaluateMetric(mosUnder38, { good: 0.0, bad: 0.10, higherIsBetter: false }), weight: DATA_WEIGHTS.streaming.mosUnder38 },
     { score: evaluateMetric(setupAvg, THRESHOLDS.streaming.setupAvg), weight: DATA_WEIGHTS.streaming.setupAvg },
-    { score: evaluateMetric(setupOver10, THRESHOLDS.streaming.setupOver10), weight: DATA_WEIGHTS.streaming.setupOver10 },
+    { score: evaluateMetric(setupOver5, THRESHOLDS.streaming.setupOver10), weight: DATA_WEIGHTS.streaming.setupOver5 },
   ]);
 
   const { score, appliedWeight } = weightedScore(metrics);
@@ -233,9 +232,8 @@ const calculateStreamingScore = (streamingMetrics) => {
     appliedWeight,
     successRatio,
     mosAvg,
-    mosP10,
     setupAvg,
-    setupOver10,
+    setupOver5,
   };
 };
 
@@ -249,22 +247,24 @@ const calculateSocialScore = (socialMetrics) => {
   });
 
   const successRatio = ratio(completed, requests);
-  const durationAvg = safeAverage(durations);
-  const durationOver15 = ratio(
-    durations.filter((val) => val > 15_000).length,
+  // Average Duration in seconds (per calculator table)
+  const durationAvg = safeAverage(durations.map(d => d / 1000)); // Convert ms to seconds
+  // Activity Duration > 5s (per calculator table)
+  const durationOver5 = ratio(
+    durations.filter((val) => val > 5_000).length, // > 5 seconds in milliseconds
     durations.length
   );
 
   console.log('[Scoring] Social calculations:', {
     successRatio,
     durationAvg,
-    durationOver15,
+    durationOver5,
   });
 
   const metrics = buildEntries([
     { score: evaluateMetric(successRatio, THRESHOLDS.social.successRatio), weight: DATA_WEIGHTS.social.successRatio },
     { score: evaluateMetric(durationAvg, THRESHOLDS.social.durationAvg), weight: DATA_WEIGHTS.social.durationAvg },
-    { score: evaluateMetric(durationOver15, THRESHOLDS.social.durationOver15), weight: DATA_WEIGHTS.social.durationOver15 },
+    { score: evaluateMetric(durationOver5, THRESHOLDS.social.durationOver5), weight: DATA_WEIGHTS.social.durationOver5 },
   ]);
 
   const { score, appliedWeight } = weightedScore(metrics);
@@ -273,7 +273,43 @@ const calculateSocialScore = (socialMetrics) => {
     appliedWeight,
     successRatio,
     durationAvg,
-    durationOver15,
+    durationOver5,
+  };
+};
+
+const calculateLatencyScore = (latencyMetrics) => {
+  const { requests = 0, completed = 0, scores = [] } = latencyMetrics || {};
+  
+  console.log('[Scoring] Latency metrics input:', {
+    requests,
+    completed,
+    scoresCount: scores.length,
+  });
+
+  // Interactivity Success Ratio: ratio of scores > 25
+  const successRatio = scores.length > 0
+    ? scores.filter((score) => score > 25).length / scores.length
+    : ratio(completed, requests);
+  
+  // Average Interactivity Score
+  const avgScore = safeAverage(scores);
+
+  console.log('[Scoring] Latency calculations:', {
+    successRatio,
+    avgScore,
+  });
+
+  const metrics = buildEntries([
+    { score: evaluateMetric(successRatio, THRESHOLDS.latency.successRatio), weight: DATA_WEIGHTS.latency.successRatio },
+    { score: evaluateMetric(avgScore, THRESHOLDS.latency.avgScore), weight: DATA_WEIGHTS.latency.avgScore },
+  ]);
+
+  const { score, appliedWeight } = weightedScore(metrics);
+  return {
+    score,
+    appliedWeight,
+    successRatio,
+    avgScore,
   };
 };
 
@@ -290,12 +326,16 @@ export const calculateScores = (metrics) => {
   const browsing = calculateBrowsingScore(metrics?.data?.browsing);
   const streaming = calculateStreamingScore(metrics?.data?.streaming);
   const social = calculateSocialScore(metrics?.data?.social);
+  const latency = calculateLatencyScore(metrics?.data?.latency);
 
+  // Data component weights per QoE Calculator table:
+  // Video Streaming: 15%, Data Testing: 30%, Latency: 15%, Browsing: 25%, Social: 15%
   const dataComponents = [
-    { score: normalizeScore(http.score, http.appliedWeight, 0.25), weight: 0.25 },
-    { score: normalizeScore(browsing.score, browsing.appliedWeight, 0.38), weight: 0.38 },
-    { score: normalizeScore(streaming.score, streaming.appliedWeight, 0.22), weight: 0.22 },
-    { score: normalizeScore(social.score, social.appliedWeight, 0.15), weight: 0.15 },
+    { score: normalizeScore(http.score, http.appliedWeight, 0.30), weight: 0.30 },      // Data Testing (HTTP/FTP)
+    { score: normalizeScore(browsing.score, browsing.appliedWeight, 0.25), weight: 0.25 }, // Browsing
+    { score: normalizeScore(streaming.score, streaming.appliedWeight, 0.15), weight: 0.15 }, // Video Streaming
+    { score: normalizeScore(latency.score, latency.appliedWeight, 0.15), weight: 0.15 },     // Latency & Interactivity
+    { score: normalizeScore(social.score, social.appliedWeight, 0.15), weight: 0.15 },      // Social Media
   ].filter((entry) => entry.score !== null);
 
   const dataWeighted = weightedScore(dataComponents);
@@ -324,6 +364,7 @@ export const calculateScores = (metrics) => {
     browsing,
     streaming,
     social,
+    latency,
     data: {
       score: dataWeighted.score,
       appliedWeight: dataWeighted.appliedWeight,

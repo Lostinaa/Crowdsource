@@ -60,20 +60,79 @@ class QoeMetricResource extends Resource
                     ->collapsible()
                     ->collapsed(),
                 
-                Forms\Components\Section::make('Metrics')
+                Forms\Components\Section::make('Voice Metrics')
                     ->schema([
-                        Forms\Components\KeyValue::make('metrics')
-                            ->label('Metrics (JSON)')
-                            ->columnSpanFull(),
+                        Forms\Components\TextInput::make('metrics.voice.attempts')
+                            ->label('Call Attempts')
+                            ->numeric()
+                            ->disabled(),
+                        Forms\Components\TextInput::make('metrics.voice.setupOk')
+                            ->label('Setup OK')
+                            ->numeric()
+                            ->disabled(),
+                        Forms\Components\TextInput::make('metrics.voice.completed')
+                            ->label('Completed')
+                            ->numeric()
+                            ->disabled(),
+                        Forms\Components\TextInput::make('metrics.voice.dropped')
+                            ->label('Dropped')
+                            ->numeric()
+                            ->disabled(),
                     ])
+                    ->columns(2)
                     ->collapsible(),
                 
-                Forms\Components\Section::make('Scores')
+                Forms\Components\Section::make('Data Metrics')
                     ->schema([
-                        Forms\Components\KeyValue::make('scores')
-                            ->label('Scores (JSON)')
-                            ->columnSpanFull(),
+                        Forms\Components\TextInput::make('metrics.data.browsing.requests')
+                            ->label('Browsing Requests')
+                            ->numeric()
+                            ->disabled(),
+                        Forms\Components\TextInput::make('metrics.data.streaming.requests')
+                            ->label('Streaming Requests')
+                            ->numeric()
+                            ->disabled(),
+                        Forms\Components\TextInput::make('metrics.data.http.dl.requests')
+                            ->label('HTTP DL Requests')
+                            ->numeric()
+                            ->disabled(),
+                        Forms\Components\TextInput::make('metrics.data.http.ul.requests')
+                            ->label('HTTP UL Requests')
+                            ->numeric()
+                            ->disabled(),
                     ])
+                    ->columns(2)
+                    ->collapsible(),
+                
+                Forms\Components\Section::make('QoE Scores')
+                    ->schema([
+                        Forms\Components\TextInput::make('scores.overall.score')
+                            ->label('Overall Score')
+                            ->numeric()
+                            ->disabled()
+                            ->suffix('%'),
+                        Forms\Components\TextInput::make('scores.voice.score')
+                            ->label('Voice Score')
+                            ->numeric()
+                            ->disabled()
+                            ->suffix('%'),
+                        Forms\Components\TextInput::make('scores.data.score')
+                            ->label('Data Score')
+                            ->numeric()
+                            ->disabled()
+                            ->suffix('%'),
+                        Forms\Components\TextInput::make('scores.browsing.score')
+                            ->label('Browsing Score')
+                            ->numeric()
+                            ->disabled()
+                            ->suffix('%'),
+                        Forms\Components\TextInput::make('scores.streaming.score')
+                            ->label('Streaming Score')
+                            ->numeric()
+                            ->disabled()
+                            ->suffix('%'),
+                    ])
+                    ->columns(2)
                     ->collapsible(),
             ]);
     }
@@ -131,15 +190,38 @@ class QoeMetricResource extends Resource
                         return $query->orderByRaw("CAST(metrics->'voice'->>'completed' AS INTEGER) {$direction}");
                     }),
                 
-                Tables\Columns\TextColumn::make('scores.overall')
+                Tables\Columns\TextColumn::make('scores.overall.score')
                     ->label('Overall Score')
-                    ->numeric(decimalPlaces: 2)
+                    ->numeric(decimalPlaces: 1)
+                    ->suffix('%')
                     ->sortable()
                     ->color(fn ($state): string => match (true) {
                         $state >= 80 => 'success',
                         $state >= 60 => 'warning',
                         default => 'danger',
                     }),
+                
+                Tables\Columns\TextColumn::make('scores.voice.score')
+                    ->label('Voice Score')
+                    ->numeric(decimalPlaces: 1)
+                    ->suffix('%')
+                    ->toggleable(),
+                
+                Tables\Columns\TextColumn::make('scores.data.score')
+                    ->label('Data Score')
+                    ->numeric(decimalPlaces: 1)
+                    ->suffix('%')
+                    ->toggleable(),
+                
+                Tables\Columns\TextColumn::make('location.latitude')
+                    ->label('Latitude')
+                    ->numeric(decimalPlaces: 6)
+                    ->toggleable(isToggledHiddenByDefault: true),
+                
+                Tables\Columns\TextColumn::make('location.longitude')
+                    ->label('Longitude')
+                    ->numeric(decimalPlaces: 6)
+                    ->toggleable(isToggledHiddenByDefault: true),
                 
                 Tables\Columns\TextColumn::make('ip_address')
                     ->label('IP Address')
@@ -220,6 +302,10 @@ class QoeMetricResource extends Resource
         ];
     }
 }
+
+
+
+
 
 
 

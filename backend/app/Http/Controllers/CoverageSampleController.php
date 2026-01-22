@@ -78,5 +78,93 @@ class CoverageSampleController extends Controller
             ],
         ], 201);
     }
+
+    /**
+     * Get coverage samples with filters
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $query = CoverageSample::query();
+
+        // Filter by user
+        if ($request->user()) {
+            $query->where('user_id', $request->user()->id);
+        }
+
+        // Filter by date range
+        if ($request->has('start_date')) {
+            $query->where('timestamp', '>=', $request->input('start_date'));
+        }
+        if ($request->has('end_date')) {
+            $query->where('timestamp', '<=', $request->input('end_date'));
+        }
+
+        // Filter by network category
+        if ($request->has('network_category')) {
+            $query->where('network_category', $request->input('network_category'));
+        }
+
+        // Filter by geographic bounds
+        if ($request->has('bounds')) {
+            $bounds = $request->input('bounds');
+            if (isset($bounds['min_lat']) && isset($bounds['max_lat'])) {
+                $query->whereBetween('latitude', [$bounds['min_lat'], $bounds['max_lat']]);
+            }
+            if (isset($bounds['min_lon']) && isset($bounds['max_lon'])) {
+                $query->whereBetween('longitude', [$bounds['min_lon'], $bounds['max_lon']]);
+            }
+        }
+
+        // Limit results for map display (last 1000 points)
+        $limit = $request->input('limit', 1000);
+        $samples = $query->orderBy('timestamp', 'desc')->limit($limit)->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $samples,
+            'count' => $samples->count(),
+        ]);
+    }
+
+    /**
+     * Get coverage statistics
+     */
+    public function statistics(Request $request): JsonResponse
+    {
+        $query = CoverageSample::query();
+
+        if ($request->user()) {
+            $query->where('user_id', $request->user()->id);
+        }
+
+        if ($request->has('start_date')) {
+            $query->where('timestamp', '>=', $request->input('start_date'));
+        }
+        if ($request->has('end_date')) {
+            $query->where('timestamp', '<=', $request->input('end_date'));
+        }
+
+        $samples = $query->get();
+
+        $stats = [
+            'total_samples' => $samples->count(),
+            'network_distribution' => $samples->groupBy('network_category')
+                ->map(fn($group) => $group->count())
+                ->toArray(),
+            'average_rsrp' => $samples->whereNotNull('rsrp')
+                ->map(fn($s) => (float) str_replace(' dBm', '', $s->rsrp))
+                ->filter()
+                ->avg(),
+            'date_range' => [
+                'start' => $samples->min('timestamp'),
+                'end' => $samples->max('timestamp'),
+            ],
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $stats,
+        ]);
+    }
 }
 
