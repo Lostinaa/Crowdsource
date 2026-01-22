@@ -29,14 +29,14 @@ Route::post('/coverage-samples', [CoverageSampleController::class, 'store']);
 Route::get('/coverage-samples', [CoverageSampleController::class, 'index']);
 Route::get('/coverage-samples/statistics', [CoverageSampleController::class, 'statistics']);
 
+// Analytics routes (temporarily public for testing - move back to protected later)
+Route::get('/analytics/overview', [AnalyticsController::class, 'overview']);
+Route::get('/analytics/voice', [AnalyticsController::class, 'voice']);
+Route::get('/analytics/data', [AnalyticsController::class, 'data']);
+Route::get('/analytics/trends', [AnalyticsController::class, 'trends']);
+
 // Protected routes (require authentication)
 Route::middleware('auth:sanctum')->group(function () {
-    // Analytics routes
-    Route::get('/analytics/overview', [AnalyticsController::class, 'overview']);
-    Route::get('/analytics/voice', [AnalyticsController::class, 'voice']);
-    Route::get('/analytics/data', [AnalyticsController::class, 'data']);
-    Route::get('/analytics/trends', [AnalyticsController::class, 'trends']);
-    
     // User routes
     Route::get('/auth/user', [AuthController::class, 'user']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);

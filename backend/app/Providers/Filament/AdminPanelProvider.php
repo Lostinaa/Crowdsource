@@ -39,6 +39,7 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 \App\Filament\Widgets\QoeMetricsOverview::class,
                 \App\Filament\Widgets\QoeMetricsChart::class,
+                \App\Filament\Widgets\EnhancedAnalyticsWidget::class,
                 Widgets\AccountWidget::class,
             ])
             ->middleware([
