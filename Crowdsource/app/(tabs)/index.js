@@ -32,8 +32,7 @@ export default function DashboardScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <Text style={styles.title}>Crowdsourcing QoE</Text>
       <Text style={styles.subtitle}>
-        End-to-end scoring using ETSI TR 103 559 weightings. Populate metrics
-        via the Voice/Data tabs to see updates in real time.
+        End-to-end scoring using ETSI TR 103 559 weightings. P
       </Text>
 
       <View style={styles.cardsRow}>

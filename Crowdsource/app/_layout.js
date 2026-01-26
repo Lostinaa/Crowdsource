@@ -7,30 +7,62 @@ export default function RootLayout() {
   useEffect(() => {
     async function onFetchUpdateAsync() {
       try {
+        // Log update info for debugging
+        console.log('[Updates] Update info:', {
+          isEnabled: Updates.isEnabled,
+          isEmbeddedLaunch: Updates.isEmbeddedLaunch,
+          isEmergencyLaunch: Updates.isEmergencyLaunch,
+          runtimeVersion: Updates.runtimeVersion,
+          channel: Updates.channel,
+          updateId: Updates.updateId,
+        });
+
         // Check for updates in production builds only
-        // In development, Updates.isEnabled will be false
         if (!Updates.isEnabled) {
           console.log('[Updates] Updates are disabled (development mode)');
           return;
         }
 
+        console.log('[Updates] Checking for updates...');
         const update = await Updates.checkForUpdateAsync();
+        
+        console.log('[Updates] Check result:', {
+          isAvailable: update.isAvailable,
+          manifest: update.manifest ? 'present' : 'missing',
+        });
 
         if (update.isAvailable) {
           console.log('[Updates] Update available, downloading...');
-          await Updates.fetchUpdateAsync();
-          console.log('[Updates] Update downloaded, reloading app...');
-          await Updates.reloadAsync();
+          const fetchResult = await Updates.fetchUpdateAsync();
+          console.log('[Updates] Fetch result:', {
+            isNew: fetchResult.isNew,
+            manifest: fetchResult.manifest ? 'present' : 'missing',
+          });
+          
+          if (fetchResult.isNew) {
+            console.log('[Updates] Update downloaded, reloading app...');
+            await Updates.reloadAsync();
+          } else {
+            console.log('[Updates] Update was already downloaded');
+          }
         } else {
-          console.log('[Updates] App is up to date');
+          console.log('[Updates] App is up to date - no update available');
         }
       } catch (error) {
         console.error('[Updates] Error checking for updates:', error);
+        console.error('[Updates] Error details:', {
+          message: error.message,
+          code: error.code,
+          stack: error.stack,
+        });
       }
     }
 
     // Check for updates on app start (only in production)
-    onFetchUpdateAsync();
+    // Delay slightly to let native module finish its check first
+    setTimeout(() => {
+      onFetchUpdateAsync();
+    }, 2000);
   }, []);
 
   return (
