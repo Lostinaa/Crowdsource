@@ -27,9 +27,22 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            // Brand the admin panel & login with Ethio telecom QoE identity
+            ->brandName('Crowdsourcing QoE')
+            ->brandLogo(fn () => asset('images/ethiotelecom-logo.png'), height: 40)
             ->colors([
-                'primary' => Color::Amber,
+                // Match mobile app theme colors (Ethio telecom brand green)
+                'primary' => Color::hex('#8ec63f'), // Brand green (#8ec63f)
+                'success' => Color::hex('#22c55e'), // Success green
+                'warning' => Color::hex('#FACC15'), // Warning yellow
+                'danger' => Color::hex('#EF4444'), // Danger red
+                'info' => Color::hex('#009FE3'), // Info blue
             ])
+            ->favicon(fn () => asset('images/ethiotelecom-logo.png'))
+            ->darkMode(false) // Use light theme to match mobile app
+            ->sidebarCollapsibleOnDesktop()
+            ->maxContentWidth('full')
+            ->css('css/filament-custom.css') // Custom branding CSS
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
