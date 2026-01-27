@@ -37,10 +37,11 @@
     --white: 255 255 255;       /* #ffffff - matches theme.background.primary & theme.colors.white */
 }
 
-/* Logo styling */
+/* Logo styling - matches mobile app branding */
 .fi-logo {
     height: 40px;
     max-width: 200px;
+    object-fit: contain;
 }
 
 /* Brand header */
