@@ -2,6 +2,8 @@ import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import * as Updates from 'expo-updates';
 import { QoEProvider } from '../src/context/QoEContext';
+import { DrawerProvider } from '../src/context/DrawerContext';
+import Drawer from '../src/components/Drawer';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -67,9 +69,12 @@ export default function RootLayout() {
 
   return (
     <QoEProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-      </Stack>
+      <DrawerProvider>
+        <Drawer />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+      </DrawerProvider>
     </QoEProvider>
   );
 }

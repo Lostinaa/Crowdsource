@@ -872,8 +872,8 @@ export default function DataScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.title}>Data QoE</Text>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <Text style={styles.title}>Data QoE</Text>
       <Text style={styles.subtitle}>
         Test browsing, streaming, file access, and social media performance metrics.
       </Text>

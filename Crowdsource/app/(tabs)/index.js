@@ -2,9 +2,14 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useEffect } from 'react';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DrawerButton from '../../src/components/DrawerButton';
+import { useDrawer } from '../../src/context/DrawerContext';
 
 export default function DashboardScreen() {
   const { scores, metrics } = useQoE();
+  const { openDrawer } = useDrawer();
+  const insets = useSafeAreaInsets();
 
   // Debug logging
   useEffect(() => {
@@ -29,33 +34,39 @@ export default function DashboardScreen() {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.title}>Crowdsourcing QoE</Text>
-      <Text style={styles.subtitle}>
-        End-to-end scoring using ETSI TR 103 559 weightings. P
-      </Text>
-
-      <View style={styles.cardsRow}>
-        {scoreCards.map((card) => (
-          <View key={card.label} style={styles.card}>
-            <Text style={styles.cardLabel}>{card.label}</Text>
-            <Text style={[styles.cardValue, { color: theme.colors.primary }]}>{card.value}</Text>
-          </View>
-        ))}
+    <View style={styles.container}>
+      <View style={[styles.menuButtonWrap, { top: insets.top + 6 }]}>
+        <DrawerButton onPress={openDrawer} />
       </View>
 
-      <View style={styles.breakdown}>
-        <Text style={styles.sectionTitle}>Coverage</Text>
-        <Text style={styles.sectionText}>
-          Voice data coverage:{' '}
-          {formatScore(scores.voice.appliedWeight)}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        <Text style={styles.title}>Crowdsourcing QoE</Text>
+        <Text style={styles.subtitle}>
+          End-to-end scoring, using ETSI TR 103 559 weightings.
         </Text>
-        <Text style={styles.sectionText}>
-          Data sub-metrics coverage:{' '}
-          {formatScore(scores.data.appliedWeight)}
-        </Text>
-      </View>
-    </ScrollView>
+
+        <View style={styles.cardsRow}>
+          {scoreCards.map((card) => (
+            <View key={card.label} style={styles.card}>
+              <Text style={styles.cardLabel}>{card.label}</Text>
+              <Text style={[styles.cardValue, { color: theme.colors.primary }]}>{card.value}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.breakdown}>
+          <Text style={styles.sectionTitle}>Coverage</Text>
+          <Text style={styles.sectionText}>
+            Voice data coverage:{' '}
+            {formatScore(scores.voice.appliedWeight)}
+          </Text>
+          <Text style={styles.sectionText}>
+            Data sub-metrics coverage:{' '}
+            {formatScore(scores.data.appliedWeight)}
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -63,6 +74,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background.secondary,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  menuButtonWrap: {
+    position: 'absolute',
+    left: 6,
+    zIndex: 10,
+    backgroundColor: theme.colors.background.primary,
+    borderRadius: theme.borderRadius.full,
+    ...theme.shadows.sm,
   },
   contentContainer: {
     paddingHorizontal: theme.spacing.md,

@@ -1,0 +1,61 @@
+services:
+  # PostgreSQL Database for QoE backend
+  qoe_postgres:
+    image: postgres:15-alpine
+    container_name: qoe_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qoe_db
+      POSTGRES_USER: qoe_user
+      POSTGRES_PASSWORD: qoe_secret_password
+    ports:
+      # Avoids conflicts with existing Postgres ports (2121, 2323, 2345, 3254, 5434, 6633)
+      - "5456:5432"
+    volumes:
+      - qoe-postgres-data:/var/lib/postgresql/data
+    networks:
+      - qoe_net
+
+  # Laravel QoE Application (PHP-FPM)
+  qoe_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: qoe_app
+    env_file:
+      - .env.docker
+    restart: unless-stopped
+    working_dir: /var/www/html
+    expose:
+      - "9000"
+    volumes:
+      - qoe-storage:/var/www/html/storage
+    networks:
+      - qoe_net
+    depends_on:
+      - qoe_postgres
+
+  # Nginx reverse proxy for QoE app
+  qoe_nginx:
+    image: nginx:alpine
+    container_name: qoe_nginx
+    restart: unless-stopped
+    ports:
+      # Avoid conflicts with existing nginx ports (9991, 9992, 9993, 9995, etc.)
+      - "9996:80"
+    volumes:
+      - ./public:/var/www/html/public:ro
+      - ./docker/qoe-nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/qoe-nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - qoe_app
+    networks:
+      - qoe_net
+
+volumes:
+  qoe-postgres-data:
+  qoe-storage:
+
+networks:
+  qoe_net:
+
