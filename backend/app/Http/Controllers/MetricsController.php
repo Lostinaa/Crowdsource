@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\QoeMetric;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use App\Services\AuditLogService;
+use App\Services\NotificationService;
 
 class MetricsController extends Controller
 {
@@ -47,6 +50,12 @@ class MetricsController extends Controller
                 'user_id' => $metric->user_id,
                 'timestamp' => $metric->timestamp,
             ]);
+
+            // Audit log
+            AuditLogService::log('created', $metric, null, $metric->toArray(), "QoE Metric stored via API");
+
+            // Check for threshold breaches and notify
+            $this->checkThresholds($metric);
 
             return response()->json([
                 'success' => true,
@@ -125,6 +134,47 @@ class MetricsController extends Controller
             'success' => true,
             'data' => $metric,
         ]);
+    }
+
+    /**
+     * Check QoE scores against thresholds and create notifications
+     */
+    private function checkThresholds(QoeMetric $metric): void
+    {
+        $scores = $metric->scores ?? [];
+        $overallScore = $scores['overall']['score'] ?? null;
+        $voiceScore = $scores['voice']['score'] ?? null;
+        $dataScore = $scores['data']['score'] ?? null;
+
+        // Threshold: Overall QoE < 60% is poor
+        if ($overallScore !== null && $overallScore < 0.60) {
+            NotificationService::notifyThresholdBreach(
+                'Overall QoE Score',
+                $overallScore * 100,
+                60,
+                $metric->user_id
+            );
+        }
+
+        // Threshold: Voice QoE < 50% is poor
+        if ($voiceScore !== null && $voiceScore < 0.50) {
+            NotificationService::notifyThresholdBreach(
+                'Voice QoE Score',
+                $voiceScore * 100,
+                50,
+                $metric->user_id
+            );
+        }
+
+        // Threshold: Data QoE < 50% is poor
+        if ($dataScore !== null && $dataScore < 0.50) {
+            NotificationService::notifyThresholdBreach(
+                'Data QoE Score',
+                $dataScore * 100,
+                50,
+                $metric->user_id
+            );
+        }
     }
 }
 

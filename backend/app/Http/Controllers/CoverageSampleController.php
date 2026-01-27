@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use App\Services\AuditLogService;
 
 class CoverageSampleController extends Controller
 {
@@ -69,6 +70,9 @@ class CoverageSampleController extends Controller
             'network_type' => $sample->network_type,
             'network_category' => $sample->network_category,
         ]);
+
+        // Audit log
+        AuditLogService::log('created', $sample, null, $sample->toArray(), "Coverage Sample stored via API");
 
         return response()->json([
             'success' => true,

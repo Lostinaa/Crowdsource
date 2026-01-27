@@ -9,6 +9,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use App\Models\Role;
 
 class User extends Authenticatable implements FilamentUser
 {
@@ -24,6 +25,7 @@ class User extends Authenticatable implements FilamentUser
         'name',
         'email',
         'password',
+        'role_id',
     ];
 
     /**
@@ -50,10 +52,39 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
+     * Get the user's role.
+     */
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * Check if user has a specific permission.
+     */
+    public function hasPermission(string $permissionName): bool
+    {
+        if (!$this->role) {
+            return false;
+        }
+
+        return $this->role->hasPermission($permissionName);
+    }
+
+    /**
+     * Check if user has a specific role.
+     */
+    public function hasRole(string $roleName): bool
+    {
+        return $this->role && $this->role->name === $roleName;
+    }
+
+    /**
      * Determine if the user can access the Filament admin panel.
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return true; // Allow all authenticated users for now
+        // Allow users with view_dashboard permission
+        return $this->hasPermission('view_dashboard');
     }
 }

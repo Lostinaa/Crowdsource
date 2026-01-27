@@ -6,6 +6,7 @@ use App\Models\QoeMetric;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\AuditLogService;
 
 class AnalyticsController extends Controller
 {
@@ -14,6 +15,8 @@ class AnalyticsController extends Controller
      */
     public function overview(Request $request): JsonResponse
     {
+        AuditLogService::log('viewed', null, null, null, "Analytics overview accessed");
+        
         $query = QoeMetric::query();
 
         // Apply filters
@@ -69,6 +72,8 @@ class AnalyticsController extends Controller
      */
     public function voice(Request $request): JsonResponse
     {
+        AuditLogService::log('viewed', null, null, null, "Voice analytics accessed");
+        
         $query = QoeMetric::query();
 
         if ($request->user()) {
@@ -123,6 +128,8 @@ class AnalyticsController extends Controller
      */
     public function data(Request $request): JsonResponse
     {
+        AuditLogService::log('viewed', null, null, null, "Data analytics accessed");
+        
         $query = QoeMetric::query();
 
         if ($request->user()) {
@@ -257,6 +264,8 @@ class AnalyticsController extends Controller
      */
     public function trends(Request $request): JsonResponse
     {
+        AuditLogService::log('viewed', null, null, null, "Analytics trends accessed");
+        
         $query = QoeMetric::query();
 
         if ($request->user()) {

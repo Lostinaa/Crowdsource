@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Role;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -66,11 +67,14 @@ class AuthController extends Controller
             ], 422);
         }
 
+        // Get default viewer role
+        $viewerRole = Role::where('name', 'viewer')->first();
+        
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => 'user', // Default role
+            'role_id' => $viewerRole?->id, // Default to viewer role
         ]);
 
         $token = $user->createToken('mobile-app')->plainTextToken;
