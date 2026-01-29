@@ -1,43 +1,68 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
-import DrawerButton from './DrawerButton';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useDrawer } from '../context/DrawerContext';
 import { theme } from '../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ScreenHeader({ title, showDrawer = true }) {
   const { openDrawer } = useDrawer();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        {showDrawer && <DrawerButton onPress={openDrawer} />}
-        <Text style={styles.title}>{title}</Text>
-        <View style={styles.spacer} />
-      </View>
-    </SafeAreaView>
+    <LinearGradient
+      colors={theme.gradient.primary}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          {showDrawer && (
+            <TouchableOpacity onPress={openDrawer} style={styles.iconButton}>
+              <Ionicons name="menu" size={28} color="white" />
+            </TouchableOpacity>
+          )}
+
+          <Text style={styles.title}>{title}</Text>
+
+          <View style={styles.rightPlaceholder}>
+            {/* Optional Right Action Button */}
+            <Ionicons name="notifications-outline" size={24} color="rgba(255,255,255,0.8)" />
+          </View>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    ...theme.shadows.md,
+    zIndex: 10,
+  },
   safeArea: {
-    backgroundColor: theme.colors.background.primary,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.light,
-    backgroundColor: theme.colors.background.primary,
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm + 4,
+    height: 60,
+  },
+  iconButton: {
+    padding: 4,
   },
   title: {
-    flex: 1,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginLeft: theme.spacing.sm,
+    color: 'white',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
-  spacer: {
-    width: 48, // Match drawer button width
+  rightPlaceholder: {
+    width: 32, // Balance the left icon
+    alignItems: 'flex-end',
   },
 });

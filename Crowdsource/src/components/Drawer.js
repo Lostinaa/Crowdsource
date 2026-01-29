@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { theme } from '../constants/theme';
 import { useDrawer } from '../context/DrawerContext';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function Drawer() {
   const { isOpen, closeDrawer } = useDrawer();
@@ -36,6 +37,11 @@ export default function Drawer() {
   }, [isOpen]);
 
   const menuItems = [
+    {
+      title: 'Dashboard',
+      icon: 'speedometer-outline',
+      route: '/(tabs)',
+    },
     {
       title: 'History',
       icon: 'time-outline',
@@ -71,13 +77,28 @@ export default function Drawer() {
                 },
               ]}
             >
-              <SafeAreaView style={styles.safeArea}>
-                <View style={styles.header}>
-                  <Text style={styles.headerTitle}>Menu</Text>
-                  <TouchableOpacity onPress={closeDrawer} style={styles.closeButton}>
-                    <Ionicons name="close" size={24} color={theme.colors.text.primary} />
-                  </TouchableOpacity>
-                </View>
+              <View style={styles.drawerContent}>
+                <LinearGradient
+                  colors={theme.gradient.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.headerGradient}
+                >
+                  <SafeAreaView>
+                    <View style={styles.headerContent}>
+                      <View style={styles.logoContainer}>
+                        <Ionicons name="bar-chart" size={32} color="white" />
+                      </View>
+                      <View>
+                        <Text style={styles.appName}>CrowdSource</Text>
+                        <Text style={styles.appVersion}>QoE Monitor v1.0</Text>
+                      </View>
+                      <TouchableOpacity onPress={closeDrawer} style={styles.closeButton}>
+                        <Ionicons name="close-circle" size={28} color="rgba(255,255,255,0.8)" />
+                      </TouchableOpacity>
+                    </View>
+                  </SafeAreaView>
+                </LinearGradient>
 
                 <View style={styles.menuContainer}>
                   {menuItems.map((item) => (
@@ -86,23 +107,23 @@ export default function Drawer() {
                       style={styles.menuItem}
                       onPress={() => handleMenuItemPress(item.route)}
                     >
-                      <Ionicons
-                        name={item.icon}
-                        size={24}
-                        color={theme.colors.primary}
-                        style={styles.menuIcon}
-                      />
+                      <View style={[styles.iconContainer, { backgroundColor: theme.colors.lightGray }]}>
+                        <Ionicons
+                          name={item.icon}
+                          size={22}
+                          color={theme.colors.primary}
+                        />
+                      </View>
                       <Text style={styles.menuItemText}>{item.title}</Text>
                       <Ionicons
                         name="chevron-forward"
-                        size={20}
-                        color={theme.colors.text.secondary}
-                        style={styles.chevron}
+                        size={18}
+                        color={theme.colors.text.light}
                       />
                     </TouchableOpacity>
                   ))}
                 </View>
-              </SafeAreaView>
+              </View>
             </Animated.View>
           </TouchableWithoutFeedback>
         </View>
@@ -114,58 +135,77 @@ export default function Drawer() {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)', // Darker overlay
     flexDirection: 'row',
   },
   drawer: {
-    width: 260,
+    width: 280, // Slightly wider
     height: '100%',
     backgroundColor: theme.colors.background.primary,
-    borderRightWidth: 1,
-    borderRightColor: theme.colors.border.light,
     ...theme.shadows.lg,
+    overflow: 'hidden', // Clean corners
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  safeArea: {
+  drawerContent: {
     flex: 1,
   },
-  header: {
+  headerGradient: {
+    paddingBottom: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+  },
+  headerContent: {
+    paddingHorizontal: theme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.light,
+    marginTop: 20,
   },
-  headerTitle: {
+  logoContainer: {
+    marginRight: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 8,
+    borderRadius: 12,
+  },
+  appName: {
     fontSize: 20,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
+    fontWeight: '800',
+    color: 'white',
+    letterSpacing: 0.5,
+  },
+  appVersion: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
   },
   closeButton: {
-    padding: theme.spacing.xs,
+    position: 'absolute',
+    right: 15,
+    top: 5,
   },
   menuContainer: {
-    paddingVertical: theme.spacing.sm,
+    paddingTop: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.light,
+    marginBottom: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
   },
-  menuIcon: {
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: theme.spacing.md,
   },
   menuItemText: {
     flex: 1,
     fontSize: 16,
     color: theme.colors.text.primary,
-    fontWeight: '500',
-  },
-  chevron: {
-    marginLeft: theme.spacing.sm,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
 });

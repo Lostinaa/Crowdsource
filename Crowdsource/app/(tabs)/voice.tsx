@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Button, Alert, Platform, PermissionsAndroid, Sc
 import { useEffect, useState, useRef } from 'react';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
+import ScreenHeader from '../../src/components/ScreenHeader';
 import BrandedButton from '../../src/components/BrandedButton';
 import CallMetrics, {
   CallStateChangePayload,
@@ -321,142 +322,142 @@ export default function VoiceScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.title}>Voice QoE</Text>
-      <Text style={styles.subtitle}>
-        Measure real call quality while you make and receive calls.
-      </Text>
+    <View style={styles.container}>
+      <ScreenHeader title="Voice Monitor" />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.contentContainer}>
+        {/* Removed duplicate title/subtitle, kept content */}
 
-      <View style={styles.statusBox}>
-        <Text style={styles.statusTitle}>Status</Text>
-        <Text style={[styles.statusText, isListening && { color: theme.colors.success }]}>
-          {isListening ? '🟢 Listening for call events' : '⚪ Listener stopped'}
-        </Text>
-      </View>
-
-      <View style={styles.buttonsRow}>
-        <BrandedButton
-          title="Start listener"
-          onPress={handleStart}
-          disabled={isListening}
-          style={{ flex: 1 }}
-          textStyle={{}}
-        />
-        <BrandedButton
-          title="Stop listener"
-          onPress={handleStop}
-          disabled={!isListening}
-          variant="outline"
-          style={{ flex: 1 }}
-          textStyle={{}}
-        />
-      </View>
-
-      <View style={styles.metricsBox}>
-        <Text style={styles.sectionTitle}>Voice Metrics</Text>
-
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Call Setup Success Rate (CSSR)</Text>
-          <Text style={styles.metricValue}>
-            {formatPercent(scores.voice.cssr)}
+        <View style={styles.statusBox}>
+          <Text style={styles.statusTitle}>Status</Text>
+          <Text style={[styles.statusText, isListening && { color: theme.colors.success }]}>
+            {isListening ? '🟢 Listening for call events' : '⚪ Listener stopped'}
           </Text>
         </View>
 
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Call Drop Rate (CDR)</Text>
-          <Text style={styles.metricValue}>
-            {formatPercent(scores.voice.cdr)}
-          </Text>
+        <View style={styles.buttonsRow}>
+          <BrandedButton
+            title="Start listener"
+            onPress={handleStart}
+            disabled={isListening}
+            style={{ flex: 1 }}
+            textStyle={{}}
+          />
+          <BrandedButton
+            title="Stop listener"
+            onPress={handleStop}
+            disabled={!isListening}
+            variant="outline"
+            style={{ flex: 1 }}
+            textStyle={{}}
+          />
         </View>
 
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Avg Call Setup Time</Text>
-          <Text style={styles.metricValue}>
-            {formatTime(scores.voice.cstAvg)}
-          </Text>
-        </View>
+        <View style={styles.metricsBox}>
+          <Text style={styles.sectionTitle}>Voice Metrics</Text>
 
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Mean Opinion Score (MOS)</Text>
-          <Text style={styles.metricValue}>
-            {formatMOS(scores.voice.mosAvg)}
-          </Text>
-        </View>
-
-        {signalMos > 0 && (
           <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Current Signal MOS (Est.)</Text>
+            <Text style={styles.metricLabel}>Call Setup Success Rate (CSSR)</Text>
             <Text style={styles.metricValue}>
-              {signalMos.toFixed(1)} 📶
+              {formatPercent(scores.voice.cssr)}
             </Text>
           </View>
-        )}
 
-        <View style={styles.divider} />
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Call Drop Rate (CDR)</Text>
+            <Text style={styles.metricValue}>
+              {formatPercent(scores.voice.cdr)}
+            </Text>
+          </View>
 
-        <Text style={styles.subsectionTitle}>Raw Statistics</Text>
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Avg Call Setup Time</Text>
+            <Text style={styles.metricValue}>
+              {formatTime(scores.voice.cstAvg)}
+            </Text>
+          </View>
 
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Total Attempts</Text>
-          <Text style={styles.metricValue}>{metrics.voice.attempts}</Text>
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Mean Opinion Score (MOS)</Text>
+            <Text style={styles.metricValue}>
+              {formatMOS(scores.voice.mosAvg)}
+            </Text>
+          </View>
+
+          {signalMos > 0 && (
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Current Signal MOS (Est.)</Text>
+              <Text style={styles.metricValue}>
+                {signalMos.toFixed(1)} 📶
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.divider} />
+
+          <Text style={styles.subsectionTitle}>Raw Statistics</Text>
+
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Total Attempts</Text>
+            <Text style={styles.metricValue}>{metrics.voice.attempts}</Text>
+          </View>
+
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Setup Successful</Text>
+            <Text style={styles.metricValue}>{metrics.voice.setupOk}</Text>
+          </View>
+
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Calls Completed</Text>
+            <Text style={styles.metricValue}>{metrics.voice.completed}</Text>
+          </View>
+
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Calls Dropped</Text>
+            <Text style={styles.metricValue}>{metrics.voice.dropped}</Text>
+          </View>
+
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Setup Time Samples</Text>
+            <Text style={styles.metricValue}>{metrics.voice.setupTimes?.length || 0}</Text>
+          </View>
+
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>MOS Samples</Text>
+            <Text style={styles.metricValue}>{metrics.voice.mosSamples?.length || 0}</Text>
+          </View>
         </View>
 
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Setup Successful</Text>
-          <Text style={styles.metricValue}>{metrics.voice.setupOk}</Text>
-        </View>
-
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Calls Completed</Text>
-          <Text style={styles.metricValue}>{metrics.voice.completed}</Text>
-        </View>
-
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Calls Dropped</Text>
-          <Text style={styles.metricValue}>{metrics.voice.dropped}</Text>
-        </View>
-
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>Setup Time Samples</Text>
-          <Text style={styles.metricValue}>{metrics.voice.setupTimes?.length || 0}</Text>
-        </View>
-
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>MOS Samples</Text>
-          <Text style={styles.metricValue}>{metrics.voice.mosSamples?.length || 0}</Text>
-        </View>
-      </View>
-
-      <View style={styles.lastEventBox}>
-        <Text style={styles.lastEventTitle}>Last call state event</Text>
-        <Text style={styles.lastEventText}>
-          {lastEvent
-            ? `${lastEvent.state} @ ${new Date(
-              lastEvent.timestamp
-            ).toLocaleTimeString()}`
-            : 'No events yet'}
-        </Text>
-        {lastEvent && (
-          <Text style={styles.eventDetails}>
-            Phone: {lastEvent.phoneNumber || 'N/A'}
+        <View style={styles.lastEventBox}>
+          <Text style={styles.lastEventTitle}>Last call state event</Text>
+          <Text style={styles.lastEventText}>
+            {lastEvent
+              ? `${lastEvent.state} @ ${new Date(
+                lastEvent.timestamp
+              ).toLocaleTimeString()}`
+              : 'No events yet'}
           </Text>
-        )}
-      </View>
+          {lastEvent && (
+            <Text style={styles.eventDetails}>
+              Phone: {lastEvent.phoneNumber || 'N/A'}
+            </Text>
+          )}
+        </View>
 
-      <View style={styles.lastEventBox}>
-        <Text style={styles.lastEventTitle}>Last disconnect reason (native)</Text>
-        <Text style={styles.lastEventText}>
-          {lastReason
-            ? getDisconnectReason(lastReason.causeCode, lastReason.causeLabel)
-            : 'No disconnect causes yet'}
-        </Text>
-        {lastReason?.timestamp && (
-          <Text style={styles.eventDetails}>
-            At: {new Date(lastReason.timestamp).toLocaleTimeString()} · Source: {lastReason.source || 'native'}
+        <View style={styles.lastEventBox}>
+          <Text style={styles.lastEventTitle}>Last disconnect reason (native)</Text>
+          <Text style={styles.lastEventText}>
+            {lastReason
+              ? getDisconnectReason(lastReason.causeCode, lastReason.causeLabel)
+              : 'No disconnect causes yet'}
           </Text>
-        )}
-      </View>
-    </ScrollView>
+          {lastReason?.timestamp && (
+            <Text style={styles.eventDetails}>
+              At: {new Date(lastReason.timestamp).toLocaleTimeString()} · Source: {lastReason.source || 'native'}
+            </Text>
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
