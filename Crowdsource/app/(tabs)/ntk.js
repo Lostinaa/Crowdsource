@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
 import { theme } from '../../src/constants/theme';
+import ScreenHeader from '../../src/components/ScreenHeader';
 
 // ✅ Modern Expo Modules way to import your Kotlin module
 const DeviceDiagnosticModule = requireNativeModule('DeviceDiagnosticModule');
@@ -71,7 +72,7 @@ export default function NetworkTab() {
           if (!backgroundStatus) {
             Alert.alert(
               "Permission Needed!",
-              "Background Location Permission Needed to get  your device network coverage information while you are not using this app! Would you please select 'Allow all time' in the next screen.",
+              "Background Location Permission Needed to get your device network coverage information while you are not using this app! Would you please select 'Allow all time' in the next screen.",
               [
                 { text: "Cancel", style: "cancel" },
                 {
@@ -113,105 +114,85 @@ export default function NetworkTab() {
     return () => clearInterval(interval);
   }, [fetchDiagnostics]);
 
-  import ScreenHeader from '../../src/components/ScreenHeader';
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={theme.colors.primary} /></View>;
 
-  export default function NetworkTab() {
-    // ... (hooks) ...
+  return (
+    <View style={styles.container}>
+      <ScreenHeader title="Network Monitor" />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.contentContainer}>
 
-    // ... (hooks) ...
+        <Text style={styles.updateText}>Last Refresh: {data?._ts}</Text>
 
-    if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={theme.colors.primary} /></View>;
+        <Card title="DEVICE INFORMATION" accent={theme.colors.purple}>
+          <Kpi label="Brand" value={data?.brand} />
+          <Kpi label="Model" value={data?.model} />
+          <Kpi label="Android Ver" value={data?.version} />
+          <Kpi label="Operator" value={data?.operator} color={theme.colors.primary} />
+        </Card>
 
-    return (
-      <View style={styles.container}>
-        <ScreenHeader title="Network Monitor" />
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.contentContainer}>
-          {/* Removed duplicate Header text */}
+        <Card title={`SIGNAL QUALITY (${data?.netType || 'N/A'})`} accent={theme.colors.primary}>
+          <Kpi label="RSRP" value={data?.rsrp ? data.rsrp + " dBm" : "---"} color={theme.colors.primary} />
+          <Kpi label="RSRQ" value={data?.rsrq ? data.rsrq + " dB" : "---"} color={theme.colors.warning} />
+          <Kpi label="RSSNR" value={data?.rssnr} color={theme.colors.success} />
+          <Kpi label="CQI" value={data?.cqi} color={theme.colors.purple} />
+        </Card>
 
-          <Text style={styles.updateText}>Last Refresh: {data?._ts}</Text>
+        <Card title="CELL IDENTITY" accent={theme.colors.success}>
+          <Kpi label="Site ID (eNB)" value={data?.enb} />
+          <Kpi label="Cell ID" value={data?.cellId} />
+          <Kpi label="PCI" value={data?.pci} />
+          <Kpi label="TAC" value={data?.tac} />
+          <Kpi label="ECI" value={data?.eci} />
+        </Card>
 
-          <Card title="DEVICE INFORMATION" accent={theme.colors.purple}>
-            <Kpi label="Brand" value={data?.brand} />
-            <Kpi label="Model" value={data?.model} />
-            <Kpi label="Android Ver" value={data?.version} />
-            <Kpi label="Operator" value={data?.operator} color={theme.colors.primary} />
-          </Card>
+        <Card title="NETWORK STATES" accent={theme.colors.primary}>
+          <Kpi label="Data State" value={data?.dataState} />
+          <Kpi label="Data Activity" value={data?.dataActivity} />
+          <Kpi label="Call State" value={data?.callState} />
+          <Kpi label="SIM State" value={data?.simState} />
+          <Kpi label="Roaming" value={data?.isRoaming} />
+        </Card>
 
-          <Card title={`SIGNAL QUALITY (${data?.netType || 'N/A'})`} accent={theme.colors.primary}>
-            <Kpi label="RSRP" value={data?.rsrp ? data.rsrp + " dBm" : "---"} color={theme.colors.primary} />
-            <Kpi label="RSRQ" value={data?.rsrq ? data.rsrq + " dB" : "---"} color={theme.colors.warning} />
-            <Kpi label="RSSNR" value={data?.rssnr} color={theme.colors.success} />
-            <Kpi label="CQI" value={data?.cqi} color={theme.colors.purple} />
-          </Card>
+        <Card title="GPS LOCATION" accent={theme.colors.warning}>
+          <Kpi label="Latitude" value={data?.lat} />
+          <Kpi label="Longitude" value={data?.lon} />
+          <Kpi label="Accuracy" value={data?.accuracy ? data.accuracy + "m" : "---"} />
+          <Kpi label="Altitude" value={data?.alt ? data.alt + "m" : "---"} />
+        </Card>
+      </ScrollView>
+    </View>
+  );
+}
 
-          <Card title="CELL IDENTITY" accent={theme.colors.success}>
-            <Kpi label="Site ID (eNB)" value={data?.enb} />
-            <Kpi label="Cell ID" value={data?.cellId} />
-            <Kpi label="PCI" value={data?.pci} />
-            <Kpi label="TAC" value={data?.tac} />
-            <Kpi label="ECI" value={data?.eci} />
-          </Card>
-
-          <Card title="NETWORK STATES" accent={theme.colors.primary}>
-            <Kpi label="Data State" value={data?.dataState} />
-            <Kpi label="Data Activity" value={data?.dataActivity} />
-            <Kpi label="Call State" value={data?.callState} />
-            <Kpi label="SIM State" value={data?.simState} />
-            <Kpi label="Roaming" value={data?.isRoaming} />
-          </Card>
-
-          <Card title="GPS LOCATION" accent={theme.colors.warning}>
-            <Kpi label="Latitude" value={data?.lat} />
-            <Kpi label="Longitude" value={data?.lon} />
-            <Kpi label="Accuracy" value={data?.accuracy ? data.accuracy + "m" : "---"} />
-            <Kpi label="Altitude" value={data?.alt ? data.alt + "m" : "---"} />
-          </Card>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.background.secondary,
-    },
-    contentContainer: {
-      paddingHorizontal: theme.spacing.md,
-      paddingTop: theme.spacing.xl + 20,
-      paddingBottom: theme.spacing.lg,
-    },
-    title: {
-      fontSize: 24,
-      fontWeight: '700',
-      color: theme.colors.text.primary,
-      marginBottom: theme.spacing.xs,
-    },
-    subtitle: {
-      fontSize: 14,
-      color: theme.colors.text.secondary,
-      marginBottom: theme.spacing.lg,
-      lineHeight: 20,
-    },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    updateText: { fontSize: 11, color: theme.colors.text.light, marginBottom: 15 },
-    card: {
-      backgroundColor: theme.colors.background.card,
-      borderRadius: theme.borderRadius.lg,
-      padding: theme.spacing.md - 1,
-      marginBottom: theme.spacing.md - 1,
-      borderTopWidth: 4,
-      ...theme.shadows.md
-    },
-    cardTitle: {
-      fontSize: 12,
-      fontWeight: 'bold',
-      letterSpacing: 1,
-      marginBottom: theme.spacing.md - 1,
-      textTransform: 'uppercase'
-    },
-    grid: { flexDirection: 'row', flexWrap: 'wrap' },
-    kpiContainer: { width: '50%', marginBottom: theme.spacing.sm },
-    kpiLabel: { fontSize: 11, color: theme.colors.text.light, textTransform: 'uppercase' },
-    kpiValue: { fontSize: 16, fontWeight: '600', marginTop: 2, color: theme.colors.text.primary }
-  });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background.secondary,
+  },
+  contentContainer: {
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md, // Reduced top padding since header is separate
+    paddingBottom: theme.spacing.lg,
+  },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  updateText: { fontSize: 11, color: theme.colors.text.light, marginBottom: 15 },
+  card: {
+    backgroundColor: theme.colors.background.card,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md - 1,
+    marginBottom: theme.spacing.md - 1,
+    borderTopWidth: 4,
+    ...theme.shadows.md
+  },
+  cardTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    marginBottom: theme.spacing.md - 1,
+    textTransform: 'uppercase'
+  },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  kpiContainer: { width: '50%', marginBottom: theme.spacing.sm },
+  kpiLabel: { fontSize: 11, color: theme.colors.text.light, textTransform: 'uppercase' },
+  kpiValue: { fontSize: 16, fontWeight: '600', marginTop: 2, color: theme.colors.text.primary }
+});
