@@ -3,18 +3,17 @@
 // For quick testing you can point this at any FTP server you control.
 
 export const FTP_CONFIG = {
-  host: 'ftp.dlptest.com',        // Example public test FTP server (may change or be rate-limited)
+  host: 'ftp.dlp-test.com',        // Public test FTP server with known files
   port: 21,
-  username: 'dlpuser',            // Example credentials – replace with yours
-  password: 'rNrKYTX9g7z3RgJRmxWuGHbeu',
+  username: 'anonymous',           // Anonymous login allowed
+  password: 'test@example.com',    // Email format for anonymous FTP
 
   // Remote paths used for tests
-  downloadPath: '/readme.txt',      // Usually exists on public FTPs
-  uploadPath: '/upload/cs-qoe-test-upload.txt', // Remote path for upload test
+  // dlp-test.com has FTP_README.txt and allows uploads to root
+  downloadPath: '/FTP_README.txt',      // Known file that exists (1.5 KB)
+  uploadPath: '/cs-qoe-test-upload.txt', // Upload to root (deleted at 2 AM UK time)
 
-  // Real FTP is enabled – tests will use the native FTP client.
-  // If the native module is missing in a build, the app will show
-  // a clear "FTP not available" error instead of faking results.
+  // Re-enabled with working server configuration
   enableRealFtp: true,
 };
 

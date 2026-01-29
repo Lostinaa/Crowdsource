@@ -794,7 +794,7 @@ export default function DataScreen() {
       // Add timeout wrapper for FTP download
       const downloadPromise = FTP.downloadFile(cleanLocalPath, FTP_CONFIG.downloadPath);
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('FTP download timeout after 30 seconds')), 30000)
+        setTimeout(() => reject(new Error('FTP download timeout after 15 seconds')), 15000)
       );
 
       await Promise.race([downloadPromise, timeoutPromise]);
@@ -896,10 +896,10 @@ export default function DataScreen() {
 
       const startTime = Date.now();
 
-      // Add timeout wrapper for FTP upload
+      // Add timeout wrapper for FTP upload (reduced to prevent crashes)
       const uploadPromise = FTP.uploadFile(cleanLocalPath, FTP_CONFIG.uploadPath);
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('FTP upload timeout after 30 seconds')), 30000)
+        setTimeout(() => reject(new Error('FTP upload timeout after 15 seconds')), 15000)
       );
 
       await Promise.race([uploadPromise, timeoutPromise]);
