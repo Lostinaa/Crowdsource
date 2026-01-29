@@ -30,13 +30,17 @@ Route::post('/coverage-samples', [CoverageSampleController::class, 'store']);
 Route::get('/coverage-samples', [CoverageSampleController::class, 'index']);
 Route::get('/coverage-samples/statistics', [CoverageSampleController::class, 'statistics']);
 
+// Push Notification routes
+Route::post('/push-tokens', [App\Http\Controllers\PushTokenController::class, 'store']);
+Route::delete('/push-tokens', [App\Http\Controllers\PushTokenController::class, 'destroy']);
+
 
 // Protected routes (require authentication)
 Route::middleware('auth:sanctum')->group(function () {
     // User routes
     Route::get('/auth/user', [AuthController::class, 'user']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
-    
+
     // Analytics routes (protected - require authentication)
     Route::get('/analytics/overview', [AnalyticsController::class, 'overview']);
     Route::get('/analytics/voice', [AnalyticsController::class, 'voice']);

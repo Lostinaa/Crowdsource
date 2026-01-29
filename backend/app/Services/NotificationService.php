@@ -21,6 +21,7 @@ class NotificationService
 
     public static function notifyThresholdBreach(string $metric, float $value, float $threshold, ?int $userId = null): void
     {
+        // 1. Create database notification
         self::create(
             'threshold_breach',
             "Threshold Breach: {$metric}",
@@ -29,6 +30,9 @@ class NotificationService
             ['metric' => $metric, 'value' => $value, 'threshold' => $threshold],
             $userId
         );
+
+        // 2. Send push notification
+        PushNotificationService::sendThresholdAlert($metric, $value, $threshold, $userId);
     }
 
     public static function notifyAllUsers(string $type, string $title, string $message, string $severity = 'info'): void

@@ -51,7 +51,7 @@ class QoeMetricResource extends Resource
                             ->maxLength(45),
                     ])
                     ->columns(3),
-                
+
                 Forms\Components\Section::make('Device Information')
                     ->schema([
                         Forms\Components\KeyValue::make('device_info')
@@ -60,7 +60,7 @@ class QoeMetricResource extends Resource
                     ])
                     ->collapsible()
                     ->collapsed(),
-                
+
                 Forms\Components\Section::make('Location')
                     ->schema([
                         Forms\Components\KeyValue::make('location')
@@ -69,7 +69,7 @@ class QoeMetricResource extends Resource
                     ])
                     ->collapsible()
                     ->collapsed(),
-                
+
                 Forms\Components\Section::make('Voice Metrics')
                     ->schema([
                         Forms\Components\TextInput::make('metrics.voice.attempts')
@@ -90,8 +90,37 @@ class QoeMetricResource extends Resource
                             ->disabled(),
                     ])
                     ->columns(2)
+                    ->columns(2)
                     ->collapsible(),
-                
+
+                Forms\Components\Section::make('Voice Details')
+                    ->schema([
+                        Forms\Components\TextInput::make('scores.voice.mosAvg')
+                            ->label('Avg MOS')
+                            ->numeric()
+                            ->disabled(),
+
+                        Forms\Components\Repeater::make('metrics.voice.reasons')
+                            ->label('Disconnect History')
+                            ->schema([
+                                Forms\Components\TextInput::make('label')
+                                    ->label('Reason'),
+                                Forms\Components\TextInput::make('code')
+                                    ->label('Code'),
+                                Forms\Components\TextInput::make('source')
+                                    ->label('Source'),
+                            ])
+                            ->columns(3)
+                            ->disabled()
+                            ->columnSpanFull(),
+
+                        Forms\Components\TagsInput::make('metrics.voice.setupTimes')
+                            ->label('Setup Times (ms)')
+                            ->disabled()
+                            ->columnSpanFull(),
+                    ])
+                    ->collapsible(),
+
                 Forms\Components\Section::make('Data Metrics')
                     ->schema([
                         Forms\Components\TextInput::make('metrics.data.browsing.requests')
@@ -113,7 +142,7 @@ class QoeMetricResource extends Resource
                     ])
                     ->columns(2)
                     ->collapsible(),
-                
+
                 Forms\Components\Section::make('QoE Scores')
                     ->schema([
                         Forms\Components\TextInput::make('scores.overall.score')
@@ -155,22 +184,22 @@ class QoeMetricResource extends Resource
                     ->label('ID')
                     ->sortable()
                     ->searchable(),
-                
+
                 Tables\Columns\TextColumn::make('user.email')
                     ->label('User')
                     ->sortable()
                     ->searchable()
                     ->default('Anonymous'),
-                
+
                 Tables\Columns\TextColumn::make('timestamp')
                     ->dateTime()
                     ->sortable()
                     ->searchable(),
-                
+
                 Tables\Columns\TextColumn::make('device_info.platform')
                     ->label('Platform')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'ios' => 'info',
                         'android' => 'success',
                         default => 'gray',
@@ -178,66 +207,66 @@ class QoeMetricResource extends Resource
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereJsonContains('device_info->platform', $search);
                     }),
-                
+
                 Tables\Columns\TextColumn::make('device_info.model')
                     ->label('Device Model')
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereJsonContains('device_info->model', $search);
                     })
                     ->limit(30),
-                
+
                 Tables\Columns\TextColumn::make('metrics.voice.attempts')
                     ->label('Voice Attempts')
                     ->numeric()
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderByRaw("CAST(metrics->'voice'->>'attempts' AS INTEGER) {$direction}");
                     }),
-                
+
                 Tables\Columns\TextColumn::make('metrics.voice.completed')
                     ->label('Voice Completed')
                     ->numeric()
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderByRaw("CAST(metrics->'voice'->>'completed' AS INTEGER) {$direction}");
                     }),
-                
+
                 Tables\Columns\TextColumn::make('scores.overall.score')
                     ->label('Overall Score')
                     ->numeric(decimalPlaces: 1)
                     ->suffix('%')
                     ->sortable()
-                    ->color(fn ($state): string => match (true) {
+                    ->color(fn($state): string => match (true) {
                         $state >= 80 => 'success',
                         $state >= 60 => 'warning',
                         default => 'danger',
                     }),
-                
+
                 Tables\Columns\TextColumn::make('scores.voice.score')
                     ->label('Voice Score')
                     ->numeric(decimalPlaces: 1)
                     ->suffix('%')
                     ->toggleable(),
-                
+
                 Tables\Columns\TextColumn::make('scores.data.score')
                     ->label('Data Score')
                     ->numeric(decimalPlaces: 1)
                     ->suffix('%')
                     ->toggleable(),
-                
+
                 Tables\Columns\TextColumn::make('location.latitude')
                     ->label('Latitude')
                     ->numeric(decimalPlaces: 6)
                     ->toggleable(isToggledHiddenByDefault: true),
-                
+
                 Tables\Columns\TextColumn::make('location.longitude')
                     ->label('Longitude')
                     ->numeric(decimalPlaces: 6)
                     ->toggleable(isToggledHiddenByDefault: true),
-                
+
                 Tables\Columns\TextColumn::make('ip_address')
                     ->label('IP Address')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -248,7 +277,7 @@ class QoeMetricResource extends Resource
                     ->relationship('user', 'email')
                     ->searchable()
                     ->preload(),
-                
+
                 Tables\Filters\Filter::make('timestamp')
                     ->form([
                         Forms\Components\DatePicker::make('created_from')
@@ -260,14 +289,14 @@ class QoeMetricResource extends Resource
                         return $query
                             ->when(
                                 $data['created_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('timestamp', '>=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('timestamp', '>=', $date),
                             )
                             ->when(
                                 $data['created_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('timestamp', '<=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('timestamp', '<=', $date),
                             );
                     }),
-                
+
                 Tables\Filters\Filter::make('platform')
                     ->form([
                         Forms\Components\Select::make('platform')
@@ -279,7 +308,7 @@ class QoeMetricResource extends Resource
                     ->query(function (Builder $query, array $data): Builder {
                         return $query->when(
                             $data['platform'],
-                            fn (Builder $query, $platform): Builder => $query->whereJsonContains('device_info->platform', $platform),
+                            fn(Builder $query, $platform): Builder => $query->whereJsonContains('device_info->platform', $platform),
                         );
                     }),
             ])
