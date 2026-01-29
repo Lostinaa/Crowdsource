@@ -375,16 +375,7 @@ export default function MapScreen() {
           )}
         </View>
 
-        {/* Network Technology Distribution Legend */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Network Technology Colors</Text>
-          {Object.entries(NETWORK_COLORS).map(([tech, color]) => (
-            <View key={tech} style={styles.legendRow}>
-              <View style={[styles.legendColor, { backgroundColor: color }]} />
-              <Text style={styles.legendText}>{tech}</Text>
-            </View>
-          ))}
-        </View>
+        {/* Network Technology Legend (compact, moved to bottom near map) */}
 
         {/* Serving Site Info (placeholder - would need actual cell tower data) */}
         <View style={styles.infoBox}>
@@ -521,6 +512,26 @@ export default function MapScreen() {
           </View>
         )}
       </View>
+
+      {/* Compact legend at the bottom, aligned horizontally */}
+      <View style={styles.legendBar}>
+        {Object.entries(NETWORK_COLORS).map(([tech, color]) => (
+          <View key={tech} style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: color }]} />
+            <Text style={styles.legendLabel}>{tech}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Compact legend at the bottom, aligned horizontally */}
+      <View style={styles.legendBar}>
+        {Object.entries(NETWORK_COLORS).map(([tech, color]) => (
+          <View key={tech} style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: color }]} />
+            <Text style={styles.legendLabel}>{tech}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -613,9 +624,35 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     fontSize: 12,
   },
+  legendBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: theme.spacing.xs,
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 4,
+  },
+  legendLabel: {
+    color: theme.colors.text.secondary,
+    fontSize: 12,
+  },
   mapContainer: {
     flex: 1,
     marginTop: '40%',
+    marginHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
+    overflow: 'hidden',
   },
   map: {
     flex: 1,

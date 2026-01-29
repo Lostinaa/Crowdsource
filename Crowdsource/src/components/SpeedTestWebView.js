@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator, Platform, TouchableWithoutFeedback, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { theme } from '../constants/theme';
 
@@ -17,7 +17,7 @@ export default function SpeedTestWebView({
   const [startTime, setStartTime] = useState(null);
   const [loadTime, setLoadTime] = useState(null);
   const [dnsTime, setDnsTime] = useState(null);
-  const [testUrl, setTestUrl] = useState('');
+  const [webSource, setWebSource] = useState(null);
   const webViewRef = useRef(null);
   const dnsStartRef = useRef(null);
 
@@ -33,21 +33,39 @@ export default function SpeedTestWebView({
 
       switch (testType) {
         case 'browsing':
-          setTestUrl('https://www.google.com');
+          setWebSource({ uri: 'https://www.google.com' });
           break;
-        case 'video':
-          // Use a test video URL - YouTube embed with autoplay
-          // Alternative: Use a direct video URL for better testing
-          setTestUrl('https://www.youtube.com/embed/jNQXAC9IVRw?autoplay=1&mute=1');
+        case 'video': {
+          // Inline HTML with real video stream and multiple resolutions
+          const videoHtml = `
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                  body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; }
+                  video { width: 100%; height: auto; max-height: 100vh; }
+                </style>
+              </head>
+              <body>
+                <video controls autoplay muted playsinline>
+                  <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+                  Your device does not support HTML5 video.
+                </video>
+              </body>
+            </html>
+          `;
+          setWebSource({ html: videoHtml });
           break;
+        }
         case 'latency':
           // Simple lightweight page for latency test (use a full HTML page, not favicon)
-          setTestUrl('https://www.google.com');
+          setWebSource({ uri: 'https://www.google.com' });
           break;
         default:
-          setTestUrl('https://www.google.com');
+          setWebSource({ uri: 'https://www.google.com' });
       }
-      console.log('[SpeedTestWebView] Test URL set to:', testType === 'browsing' ? 'https://www.google.com' : testType === 'video' ? 'YouTube embed' : 'https://www.google.com');
+      console.log('[SpeedTestWebView] Source set for type:', testType);
     }
   }, [visible, testType]);
 
@@ -166,103 +184,120 @@ export default function SpeedTestWebView({
     return null;
   }
 
-  console.log('[SpeedTestWebView] Rendering Modal, visible:', visible, 'testType:', testType, 'testUrl:', testUrl);
+  console.log('[SpeedTestWebView] Rendering Modal, visible:', visible, 'testType:', testType, 'hasSource:', !!webSource);
 
   return (
     <Modal
       visible={visible && !!testType}
-      animationType="slide"
-      presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'}
+      animationType="fade"
       onRequestClose={onClose}
-      transparent={false}
-      statusBarTranslucent={false}
+      transparent={true}
+      statusBarTranslucent={true}
     >
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>{getTestTitle()}</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>✕</Text>
-          </TouchableOpacity>
-        </View>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.overlay}>
+          <TouchableWithoutFeedback>
+            <View style={styles.modalCard}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>{getTestTitle()}</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* Test Info */}
-        <View style={styles.infoBar}>
-          {loading && (
-            <View style={styles.infoRow}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-              <Text style={styles.infoText}>Loading test page...</Text>
-            </View>
-          )}
-          {loadTime !== null && (
-            <View style={styles.metricsContainer}>
-              <View style={styles.metricItem}>
-                <Text style={styles.metricLabel}>Load Time:</Text>
-                <Text style={styles.metricValue}>{(loadTime / 1000).toFixed(2)}s</Text>
+          {/* Test Info */}
+          <View style={styles.infoBar}>
+            {loading && (
+              <View style={styles.infoRow}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text style={styles.infoText}>Loading test page...</Text>
               </View>
-              {dnsTime !== null && (
+            )}
+            {loadTime !== null && (
+              <View style={styles.metricsContainer}>
                 <View style={styles.metricItem}>
-                  <Text style={styles.metricLabel}>DNS Time:</Text>
-                  <Text style={styles.metricValue}>{(dnsTime / 1000).toFixed(2)}s</Text>
+                  <Text style={styles.metricLabel}>Load Time:</Text>
+                  <Text style={styles.metricValue}>{(loadTime / 1000).toFixed(2)}s</Text>
+                </View>
+                {dnsTime !== null && (
+                  <View style={styles.metricItem}>
+                    <Text style={styles.metricLabel}>DNS Time:</Text>
+                    <Text style={styles.metricValue}>{(dnsTime / 1000).toFixed(2)}s</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+
+              {/* WebView */}
+              {webSource ? (
+                <WebView
+                  ref={webViewRef}
+                  source={webSource}
+                  style={styles.webview}
+                  onLoadStart={handleLoadStart}
+                  onLoadEnd={handleLoadEnd}
+                  onError={handleError}
+                  onMessage={handleMessage}
+                  javaScriptEnabled={true}
+                  domStorageEnabled={true}
+                  startInLoadingState={true}
+                  cacheEnabled={false}
+                  mediaPlaybackRequiresUserAction={false}
+                  allowsInlineMediaPlayback={true}
+                  mixedContentMode="always"
+                />
+              ) : (
+                <View style={[styles.webview, { justifyContent: 'center', alignItems: 'center' }]}>
+                  <ActivityIndicator size="large" color={theme.colors.primary} />
+                  <Text style={{ marginTop: theme.spacing.md, color: theme.colors.text.secondary }}>
+                    Preparing test...
+                  </Text>
                 </View>
               )}
+
+              {/* Footer */}
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>
+                  {testType === 'browsing' && 'Testing page load performance...'}
+                  {testType === 'video' && 'Testing video playback...'}
+                  {testType === 'latency' && 'Testing connection latency...'}
+                </Text>
+                {loadTime !== null && (
+                  <TouchableOpacity 
+                    style={styles.doneButton}
+                    onPress={onClose}
+                  >
+                    <Text style={styles.doneButtonText}>Done</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
-          )}
+          </TouchableWithoutFeedback>
         </View>
-
-        {/* WebView */}
-        {testUrl ? (
-          <WebView
-            ref={webViewRef}
-            source={{ uri: testUrl }}
-            style={styles.webview}
-            onLoadStart={handleLoadStart}
-            onLoadEnd={handleLoadEnd}
-            onError={handleError}
-            onMessage={handleMessage}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={true}
-            scalesPageToFit={true}
-            cacheEnabled={false}
-            mediaPlaybackRequiresUserAction={false}
-            allowsInlineMediaPlayback={true}
-            mixedContentMode="always"
-          />
-        ) : (
-          <View style={[styles.webview, { justifyContent: 'center', alignItems: 'center' }]}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={{ marginTop: theme.spacing.md, color: theme.colors.text.secondary }}>
-              Preparing test...
-            </Text>
-          </View>
-        )}
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            {testType === 'browsing' && 'Testing page load performance...'}
-            {testType === 'video' && 'Testing video playback...'}
-            {testType === 'latency' && 'Testing connection latency...'}
-          </Text>
-          {loadTime !== null && (
-            <TouchableOpacity 
-              style={styles.doneButton}
-              onPress={onClose}
-            >
-              <Text style={styles.doneButtonText}>Done</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  overlay: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.md,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 520,
+    // Hard height so the WebView actually renders (prevents zero-height flex issues)
+    height: Math.min(560, Math.max(420, Dimensions.get('window').height * 0.75)),
     backgroundColor: theme.colors.background.primary,
+    borderRadius: theme.borderRadius.lg,
+    overflow: 'hidden',
+    ...theme.shadows.lg,
   },
   header: {
     flexDirection: 'row',
@@ -325,6 +360,7 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
+    backgroundColor: theme.colors.background.primary,
   },
   footer: {
     padding: theme.spacing.md,

@@ -1,15 +1,14 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
 import { useEffect } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DrawerButton from '../../src/components/DrawerButton';
 import { useDrawer } from '../../src/context/DrawerContext';
 
 export default function DashboardScreen() {
   const { scores, metrics } = useQoE();
   const { openDrawer } = useDrawer();
-  const insets = useSafeAreaInsets();
 
   // Debug logging
   useEffect(() => {
@@ -34,15 +33,23 @@ export default function DashboardScreen() {
   ];
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.menuButtonWrap, { top: insets.top + 6 }]}>
+    <SafeAreaView style={styles.safeArea}>
+      {/* Top brand bar: logo + app name + menu (matches Great Run style) */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Image
+            source={require('../../assets/images/ethiotelecomlogo.png')}
+            style={styles.logo}
+          />
+          <Text style={styles.headerTitle}>Crowdsourcing QoE</Text>
+        </View>
         <DrawerButton onPress={openDrawer} />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        <Text style={styles.title}>Crowdsourcing QoE</Text>
+        <Text style={styles.title}>Dashboard</Text>
         <Text style={styles.subtitle}>
-          End-to-end scoring, using ETSI TR 103 559 weightings.
+          End-to-end QoE scoring using ETSI TR 103 559.
         </Text>
 
         <View style={styles.cardsRow}>
@@ -57,38 +64,53 @@ export default function DashboardScreen() {
         <View style={styles.breakdown}>
           <Text style={styles.sectionTitle}>Coverage</Text>
           <Text style={styles.sectionText}>
-            Voice data coverage:{' '}
-            {formatScore(scores.voice.appliedWeight)}
+            Voice data coverage: {formatScore(scores.voice.appliedWeight)}
           </Text>
           <Text style={styles.sectionText}>
-            Data sub-metrics coverage:{' '}
-            {formatScore(scores.data.appliedWeight)}
+            Data sub-metrics coverage: {formatScore(scores.data.appliedWeight)}
           </Text>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background.secondary,
   },
   scrollView: {
     flex: 1,
   },
-  menuButtonWrap: {
-    position: 'absolute',
-    left: 6,
-    zIndex: 10,
+  header: {
     backgroundColor: theme.colors.background.primary,
-    borderRadius: theme.borderRadius.full,
-    ...theme.shadows.sm,
+    borderBottomColor: theme.colors.border.light,
+    borderBottomWidth: 1,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  logo: {
+    width: 64,
+    height: 64,
+    resizeMode: 'contain',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
   },
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.xl + 20,
+    paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing.lg,
   },
   title: {

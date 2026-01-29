@@ -118,9 +118,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   drawer: {
-    width: 280,
+    width: 260,
     height: '100%',
     backgroundColor: theme.colors.background.primary,
+    borderRightWidth: 1,
+    borderRightColor: theme.colors.border.light,
     ...theme.shadows.lg,
   },
   safeArea: {

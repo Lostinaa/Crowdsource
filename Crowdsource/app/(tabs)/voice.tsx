@@ -277,8 +277,7 @@ export default function VoiceScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <Text style={styles.title}>Voice QoE</Text>
       <Text style={styles.subtitle}>
-        Native module is listening to Android call state. Make and end calls to
-        see events.
+        Measure real call quality while you make and receive calls.
       </Text>
 
       <View style={styles.statusBox}>

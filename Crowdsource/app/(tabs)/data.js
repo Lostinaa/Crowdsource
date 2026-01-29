@@ -1,10 +1,27 @@
 import { View, Text, StyleSheet, Button, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { useState, useEffect } from 'react';
 import NetInfo from '@react-native-community/netinfo';
+import * as FileSystem from 'expo-file-system';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
 import SpeedTestWebView from '../../src/components/SpeedTestWebView';
 import BrandedButton from '../../src/components/BrandedButton';
+import { FTP_CONFIG } from '../../src/constants/config';
+
+// Lazy-load FTP native module so the app doesn't crash in Expo Go
+let FTPClient = null;
+const getFTPClient = () => {
+  if (FTPClient) return FTPClient;
+  try {
+    // eslint-disable-next-line global-require, import/no-extraneous-dependencies
+    const mod = require('@kingfang007/react-native-ftp-client');
+    FTPClient = mod.default || mod;
+  } catch (e) {
+    console.warn('[Data] FTP client native module not available:', e?.message || e);
+    FTPClient = null;
+  }
+  return FTPClient;
+};
 
 export default function DataScreen() {
   const { metrics, scores, addBrowsingSample, addStreamingSample, addHttpSample, addSocialSample, addFtpSample, addLatencySample } = useQoE();
@@ -12,6 +29,7 @@ export default function DataScreen() {
   const [networkState, setNetworkState] = useState(null);
   const [webViewVisible, setWebViewVisible] = useState(false);
   const [webViewTestType, setWebViewTestType] = useState(null);
+
 
   // Debug: Log state changes
   useEffect(() => {
@@ -54,18 +72,18 @@ export default function DataScreen() {
   };
 
   // Browsing test with WebView (nPerf-style)
-  const testBrowsing = async (silent = false) => {
+  const testBrowsing = async ({ silent = false, showAlert = true } = {}) => {
     if (isTesting && !silent) return;
-    
+
     // Check network connectivity first
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      if (!silent) {
+      if (!silent && showAlert) {
         Alert.alert('No Internet', 'Please check your internet connection and try again.');
       }
       return;
     }
-    
+
     if (!silent) {
       // Open WebView modal for visual test
       console.log('[Data] Opening WebView for browsing test');
@@ -73,7 +91,7 @@ export default function DataScreen() {
       setWebViewVisible(true);
       return;
     }
-    
+
     // Silent mode: run background test
     setIsTesting(true);
     const startTime = Date.now();
@@ -83,7 +101,7 @@ export default function DataScreen() {
       const testUrl = 'https://www.google.com/favicon.ico';
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
+
       const dnsStart = Date.now();
       const response = await fetch(testUrl, {
         method: 'GET',
@@ -111,6 +129,7 @@ export default function DataScreen() {
           dnsResolutionTimeMs: dnsTime,
           throughputKbps: throughputKbps,
         });
+
       }
     } catch (error) {
       console.error('[Data] Browsing test error:', error);
@@ -128,18 +147,12 @@ export default function DataScreen() {
         durationMs: result.duration,
         dnsResolutionTimeMs: result.dnsTime,
       });
-      if (result.success) {
-        Alert.alert('Success', `Browsing test completed in ${(result.duration / 1000).toFixed(2)}s`);
-      }
     } else if (webViewTestType === 'video') {
       addStreamingSample({
         request: true,
         completed: result.success,
         setupTimeMs: result.duration,
       });
-      if (result.success) {
-        Alert.alert('Success', `Video test completed in ${(result.duration / 1000).toFixed(2)}s`);
-      }
     } else if (webViewTestType === 'latency') {
       // Calculate interactivity score from latency
       const latencyScore = result.duration < 100 ? 100 : Math.max(0, 100 - ((result.duration - 100) / 9));
@@ -148,16 +161,13 @@ export default function DataScreen() {
         completed: result.success,
         score: Math.round(latencyScore),
       });
-      if (result.success) {
-        Alert.alert('Success', `Latency: ${result.duration}ms`);
-      }
     }
     setWebViewVisible(false);
     setWebViewTestType(null);
   };
   const fulltest = async () => {
     if (isTesting) return;
-    
+
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
       Alert.alert('No Internet', 'Please check your connection before starting the full test.');
@@ -165,10 +175,10 @@ export default function DataScreen() {
     }
 
     setIsTesting(true);
-    
+
     try {
-      // Step-by-step execution using 'silent' mode to prevent multiple alerts and state conflicts
-      await testBrowsing(true);
+      // Step-by-step execution using silent mode to prevent multiple alerts
+      await testBrowsing({ silent: true, showAlert: false });
       await testStreaming(true);
       await testHttpDownload(true);
       await testHttpUpload(true);
@@ -188,7 +198,7 @@ export default function DataScreen() {
   // Real streaming test with actual video/audio streaming
   const testStreaming = async (silent = false) => {
     if (isTesting && !silent) return;
-    
+
     // Check network connectivity first
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
@@ -197,7 +207,7 @@ export default function DataScreen() {
       }
       return;
     }
-    
+
     if (!silent) {
       // Open WebView modal for visual video test
       console.log('[Data] Opening WebView for video streaming test');
@@ -205,8 +215,8 @@ export default function DataScreen() {
       setWebViewVisible(true);
       return;
     }
-    
-    setIsTesting(true);
+
+    if (!silent) setIsTesting(true);
 
     const startTime = Date.now();
     addStreamingSample({ request: true });
@@ -218,17 +228,17 @@ export default function DataScreen() {
         'https://httpbin.org/image/png', // Small test image
         'https://www.google.com/favicon.ico', // Very small file
       ];
-      
+
       let response = null;
       let lastError = null;
       let setupStart = null;
-      
+
       // Try each URL until one works
       for (const url of testUrls) {
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
-          
+
           setupStart = Date.now();
           response = await fetch(url, {
             method: 'GET',
@@ -236,7 +246,7 @@ export default function DataScreen() {
             signal: controller.signal,
           });
           clearTimeout(timeoutId);
-          
+
           if (response.ok) {
             break; // Success, exit loop
           } else {
@@ -249,13 +259,13 @@ export default function DataScreen() {
           continue; // Try next URL
         }
       }
-      
+
       if (!response || !response.ok) {
         throw lastError || new Error('All streaming URLs failed');
       }
 
       const setupDelay = Date.now() - (setupStart || Date.now());
-      
+
       // Update with setup time (don't count as new request)
       addStreamingSample({
         request: false,
@@ -267,12 +277,12 @@ export default function DataScreen() {
       const streamStart = Date.now();
       let totalBytes = 0;
       let streamTime = 0;
-      
+
       try {
         // Check content-length first to avoid downloading huge files
         const contentLength = response.headers.get('content-length');
         const maxSize = 5 * 1024 * 1024; // 5MB max - safety limit
-        
+
         if (contentLength) {
           const fileSize = parseInt(contentLength, 10);
           if (fileSize > maxSize) {
@@ -284,7 +294,7 @@ export default function DataScreen() {
             // Safe to download - file is small
             const blob = await Promise.race([
               response.blob(),
-              new Promise((_, reject) => 
+              new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Download timeout')), 15000)
               )
             ]);
@@ -296,13 +306,13 @@ export default function DataScreen() {
           try {
             const blob = await Promise.race([
               response.blob(),
-              new Promise((_, reject) => 
+              new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Download timeout')), 10000)
               )
             ]);
             totalBytes = blob.size;
             streamTime = Date.now() - streamStart;
-            
+
             // Safety check - if blob is too large, cap it
             if (totalBytes > maxSize) {
               console.warn(`[Data] Downloaded file too large (${totalBytes} bytes), capping`);
@@ -321,7 +331,7 @@ export default function DataScreen() {
         totalBytes = 100 * 1024; // Estimate 100KB
         streamTime = Date.now() - streamStart || 1000;
       }
-      
+
       const totalTime = Date.now() - startTime;
 
       // Calculate throughput in Kbps
@@ -331,7 +341,7 @@ export default function DataScreen() {
       const throughputKbps = totalBytes > 0 && effectiveTime > 0
         ? (totalBytes * 8 * 1000) / effectiveTime // Convert bytes to bits, then ms to seconds, then to Kbps
         : 0;
-      
+
       console.log('[Data] Streaming throughput calc:', {
         totalBytes,
         streamTime,
@@ -368,33 +378,46 @@ export default function DataScreen() {
         resolution: resolution,
       });
 
-      Alert.alert('Success', `Streaming test completed\nThroughput: ${(throughputKbps / 1000).toFixed(2)} Mbps\nMOS: ${mos.toFixed(2)}`);
+      if (!silent) {
+        setTimeout(() => {
+          Alert.alert(
+            'Streaming Test',
+            `Throughput: ${(throughputKbps / 1000).toFixed(2)} Mbps\nMOS: ${mos.toFixed(2)}\nResolution: ${resolution}`,
+          );
+        }, 100);
+      }
     } catch (error) {
       console.error('[Data] Streaming test error:', error);
-      let errorMsg = error.message;
-      if (error.name === 'AbortError') {
-        errorMsg = 'Request timed out. Check your internet connection.';
-      } else if (error.message === 'Network request failed') {
-        errorMsg = 'Network request failed. Check your internet connection.';
+      if (!silent) {
+        let errorMsg = error.message;
+        if (error.name === 'AbortError') {
+          errorMsg = 'Request timed out. Check your internet connection.';
+        } else if (error.message === 'Network request failed') {
+          errorMsg = 'Network request failed. Check your internet connection.';
+        }
+        setTimeout(() => {
+          Alert.alert('Streaming Test Failed', errorMsg);
+        }, 100);
       }
-      Alert.alert('Error', `Streaming test failed: ${errorMsg}`);
     } finally {
-      setIsTesting(false);
+      if (!silent) setIsTesting(false);
     }
   };
 
   // Real HTTP download test with actual file download
-  const testHttpDownload = async () => {
-    if (isTesting) return;
-    
+  const testHttpDownload = async (silent = false) => {
+    if (isTesting && !silent) return;
+
     // Check network connectivity first
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      if (!silent) {
+        Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      }
       return;
     }
-    
-    setIsTesting(true);
+
+    if (!silent) setIsTesting(true);
 
     addHttpSample('dl', { request: true });
 
@@ -405,23 +428,23 @@ export default function DataScreen() {
         'https://www.google.com/favicon.ico',
         'https://httpbin.org/image/png',
       ];
-      
+
       let response = null;
       let lastError = null;
-      
+
       // Try each URL until one works
       for (const url of testUrls) {
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-          
+
           response = await fetch(url, {
             method: 'GET',
             cache: 'no-cache',
             signal: controller.signal,
           });
           clearTimeout(timeoutId);
-          
+
           if (response.ok) {
             break; // Success, exit loop
           } else {
@@ -434,11 +457,11 @@ export default function DataScreen() {
           continue; // Try next URL
         }
       }
-      
+
       if (!response || !response.ok) {
         throw lastError || new Error('All download URLs failed');
       }
-      
+
       const startTime = Date.now();
 
       // Measure download throughput
@@ -446,16 +469,16 @@ export default function DataScreen() {
       const blob = await response.blob();
       const downloadTime = Date.now() - downloadStart;
       const totalTime = Date.now() - startTime;
-      
+
       // Calculate throughput in Mbps
       const sizeBytes = blob.size;
       // Use Math.max to ensure we never divide by 0, and use at least 1ms
       // For very fast downloads, use total time as fallback
       const effectiveTime = Math.max(downloadTime, totalTime, 1);
       const throughputMbps = sizeBytes > 0 && effectiveTime > 0
-        ? (sizeBytes * 8) / (effectiveTime * 1000) // Convert bytes to bits, then to Mbps
+        ? (sizeBytes * 8 * 1000) / (effectiveTime * 1000000) // Convert bytes to bits, ms to seconds, then to Mbps
         : 0;
-      
+
       console.log('[Data] HTTP download throughput calc:', {
         sizeBytes,
         downloadTime,
@@ -469,60 +492,68 @@ export default function DataScreen() {
         throughputMbps: throughputMbps,
       });
 
-      Alert.alert('Success', `Download completed: ${throughputMbps.toFixed(2)} Mbps\nSize: ${(sizeBytes / 1024).toFixed(2)} KB`);
+      if (!silent) {
+        setTimeout(() => {
+          Alert.alert(
+            'HTTP Download Result',
+            `Throughput: ${throughputMbps.toFixed(2)} Mbps\nSize: ${(sizeBytes / 1024).toFixed(2)} KB`,
+          );
+        }, 100);
+      }
     } catch (error) {
       console.error('[Data] HTTP download error:', error);
-      let errorMsg = error.message;
-      if (error.name === 'AbortError') {
-        errorMsg = 'Request timed out. Check your internet connection.';
-      } else if (error.message === 'Network request failed') {
-        errorMsg = 'Network request failed. Check your internet connection.';
+      if (!silent) {
+        let errorMsg = error.message;
+        if (error.name === 'AbortError') {
+          errorMsg = 'Request timed out. Check your internet connection.';
+        } else if (error.message === 'Network request failed') {
+          errorMsg = 'Network request failed. Check your internet connection.';
+        }
+        setTimeout(() => {
+          Alert.alert('HTTP Download Failed', errorMsg);
+        }, 100);
       }
-      Alert.alert('Error', `Download failed: ${errorMsg}`);
     } finally {
-      setIsTesting(false);
+      if (!silent) setIsTesting(false);
     }
   };
 
   // Real HTTP upload test with actual data upload
-  const testHttpUpload = async () => {
-    if (isTesting) return;
-    
+  const testHttpUpload = async (silent = false) => {
+    if (isTesting && !silent) return;
+
     // Check network connectivity first
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      if (!silent) {
+        Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      }
       return;
     }
-    
-    setIsTesting(true);
+
+    if (!silent) setIsTesting(true);
 
     addHttpSample('ul', { request: true });
 
     try {
-      // Create test data to upload (100KB)
+      // Create test data to upload (100KB) as plain text to avoid ArrayBuffer issues
       const testDataSize = 100 * 1024; // 100KB
-      const testData = new Uint8Array(testDataSize);
-      // Fill with random data
-      for (let i = 0; i < testDataSize; i++) {
-        testData[i] = Math.floor(Math.random() * 256);
-      }
-      const blob = new Blob([testData]);
+      const testData = 'x'.repeat(testDataSize);
 
       // Use a test upload endpoint (httpbin.org provides a free test endpoint)
       const uploadUrl = 'https://httpbin.org/post';
-      
+
       // Create AbortController for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
-      
+
       const startTime = Date.now();
       const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/octet-stream',
+          'Content-Type': 'text/plain',
         },
-        body: blob,
+        body: testData,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -543,33 +574,46 @@ export default function DataScreen() {
         throughputMbps: throughputMbps,
       });
 
-      Alert.alert('Success', `Upload completed: ${throughputMbps.toFixed(2)} Mbps\nSize: ${(testDataSize / 1024).toFixed(2)} KB`);
+      if (!silent) {
+        setTimeout(() => {
+          Alert.alert(
+            'HTTP Upload Result',
+            `Throughput: ${throughputMbps.toFixed(2)} Mbps\nSize: ${(testDataSize / 1024).toFixed(2)} KB`,
+          );
+        }, 100);
+      }
     } catch (error) {
       console.error('[Data] HTTP upload error:', error);
-      let errorMsg = error.message;
-      if (error.name === 'AbortError') {
-        errorMsg = 'Request timed out. Check your internet connection.';
-      } else if (error.message === 'Network request failed') {
-        errorMsg = 'Network request failed. Check your internet connection.';
+      if (!silent) {
+        let errorMsg = error.message;
+        if (error.name === 'AbortError') {
+          errorMsg = 'Request timed out. Check your internet connection.';
+        } else if (error.message === 'Network request failed') {
+          errorMsg = 'Network request failed. Check your internet connection.';
+        }
+        setTimeout(() => {
+          Alert.alert('HTTP Upload Failed', errorMsg);
+        }, 100);
       }
-      Alert.alert('Error', `Upload failed: ${errorMsg}`);
     } finally {
-      setIsTesting(false);
+      if (!silent) setIsTesting(false);
     }
   };
 
   // Real social media test with actual API-like request
-  const testSocialMedia = async () => {
-    if (isTesting) return;
-    
+  const testSocialMedia = async (silent = false) => {
+    if (isTesting && !silent) return;
+
     // Check network connectivity first
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      if (!silent) {
+        Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      }
       return;
     }
-    
-    setIsTesting(true);
+
+    if (!silent) setIsTesting(true);
 
     const startTime = Date.now();
     addSocialSample({ request: true });
@@ -581,18 +625,18 @@ export default function DataScreen() {
         'https://httpbin.org/json',
         'https://api.github.com/zen', // GitHub API (lightweight)
       ];
-      
+
       let response = null;
       let lastError = null;
-      
+
       let requestStart = null;
-      
+
       // Try each URL until one works
       for (const url of testUrls) {
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-          
+
           requestStart = Date.now();
           response = await fetch(url, {
             method: 'GET',
@@ -600,7 +644,7 @@ export default function DataScreen() {
             signal: controller.signal,
           });
           clearTimeout(timeoutId);
-          
+
           if (response.ok) {
             break; // Success, exit loop
           } else {
@@ -614,7 +658,7 @@ export default function DataScreen() {
           continue; // Try next URL
         }
       }
-      
+
       if (!response || !response.ok) {
         throw lastError || new Error('All social media URLs failed');
       }
@@ -627,13 +671,13 @@ export default function DataScreen() {
       } else {
         responseData = await response.text();
       }
-      
+
       const duration = Date.now() - startTime;
       const requestTime = requestStart ? Date.now() - requestStart : duration;
 
       // Calculate throughput (Kbps)
-      const responseSize = typeof responseData === 'string' 
-        ? responseData.length 
+      const responseSize = typeof responseData === 'string'
+        ? responseData.length
         : JSON.stringify(responseData).length;
       const throughputKbps = requestTime > 0
         ? (responseSize * 8 * 1000) / requestTime // Convert bytes to bits, then ms to seconds, then to Kbps
@@ -645,63 +689,89 @@ export default function DataScreen() {
         throughputKbps: throughputKbps,
       });
 
-      Alert.alert('Success', `Social media test completed in ${(duration / 1000).toFixed(2)}s`);
+      if (!silent) {
+        setTimeout(() => {
+          Alert.alert('Social Media Test', `Completed in ${(duration / 1000).toFixed(2)}s`);
+        }, 100);
+      }
     } catch (error) {
       console.error('[Data] Social media test error:', error);
-      let errorMsg = error.message;
-      if (error.name === 'AbortError') {
-        errorMsg = 'Request timed out. Check your internet connection.';
-      } else if (error.message === 'Network request failed') {
-        errorMsg = 'Network request failed. Check your internet connection.';
+      if (!silent) {
+        let errorMsg = error.message;
+        if (error.name === 'AbortError') {
+          errorMsg = 'Request timed out. Check your internet connection.';
+        } else if (error.message === 'Network request failed') {
+          errorMsg = 'Network request failed. Check your internet connection.';
+        }
+        setTimeout(() => {
+          Alert.alert('Social Media Test Failed', errorMsg);
+        }, 100);
       }
-      Alert.alert('Error', `Social media test failed: ${errorMsg}`);
     } finally {
-      setIsTesting(false);
+      if (!silent) setIsTesting(false);
     }
   };
 
-  // FTP Download test
-  const testFtpDownload = async () => {
-    if (isTesting) return;
-    
+  // FTP Download test (real FTP via native client)
+  const testFtpDownload = async (silent = false) => {
+    if (isTesting && !silent) return;
+
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      if (!silent) {
+        Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      }
       return;
     }
-    
+
+    const FTP = getFTPClient();
+    if (!FTP) {
+      if (!silent) {
+        Alert.alert(
+          'FTP not available',
+          'FTP tests require a custom build of the app (expo run:android / ios).',
+        );
+      }
+      return;
+    }
+
     setIsTesting(true);
     addFtpSample('dl', { request: true });
 
     try {
-      // Use HTTP as FTP proxy (most FTP servers require special handling)
-      // For testing, we'll use a file download that simulates FTP behavior
-      const testUrl = 'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png';
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
-      
-      const startTime = Date.now();
-      const response = await fetch(testUrl, {
-        method: 'GET',
-        cache: 'no-cache',
-        signal: controller.signal,
+      // Setup FTP connection
+      FTP.setup({
+        ip_address: FTP_CONFIG.host,
+        port: FTP_CONFIG.port,
+        username: FTP_CONFIG.username,
+        password: FTP_CONFIG.password,
       });
-      clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      const localPath = `${FileSystem.cacheDirectory}ftp-download-test.bin`;
+
+      // Strip file:// prefix for native module compatibility
+      const cleanLocalPath = localPath.replace('file://', '');
+
+      const startTime = Date.now();
+      
+      // Add timeout wrapper for FTP download
+      const downloadPromise = FTP.downloadFile(cleanLocalPath, FTP_CONFIG.downloadPath);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('FTP download timeout after 30 seconds')), 30000)
+      );
+      
+      await Promise.race([downloadPromise, timeoutPromise]);
+      const totalTime = Date.now() - startTime || 1;
+
+      const info = await FileSystem.getInfoAsync(localPath);
+      const sizeBytes = info?.size || 0;
+
+      if (sizeBytes === 0) {
+        throw new Error('Downloaded file is empty or does not exist');
       }
 
-      const downloadStart = Date.now();
-      const blob = await response.blob();
-      const downloadTime = Date.now() - downloadStart;
-      const totalTime = Date.now() - startTime;
-
-      const sizeBytes = blob.size;
-      const effectiveTime = Math.max(downloadTime, totalTime, 1);
-      const throughputKbps = sizeBytes > 0 && effectiveTime > 0
-        ? (sizeBytes * 8 * 1000) / effectiveTime
+      const throughputKbps = sizeBytes > 0 && totalTime > 0
+        ? (sizeBytes * 8 * 1000) / totalTime
         : 0;
 
       addFtpSample('dl', {
@@ -709,61 +779,90 @@ export default function DataScreen() {
         throughputKbps: throughputKbps,
       });
 
-      Alert.alert('Success', `FTP Download completed: ${(throughputKbps / 1000).toFixed(2)} Mbps`);
+      if (!silent) {
+        setTimeout(() => {
+          Alert.alert(
+            'FTP Download Success',
+            `Throughput: ${(throughputKbps / 1000).toFixed(2)} Mbps\nSize: ${(sizeBytes / 1024).toFixed(2)} KB`,
+          );
+        }, 100);
+      }
+
+      // Clean up local file
+      if (info?.exists) {
+        await FileSystem.deleteAsync(localPath, { idempotent: true });
+      }
     } catch (error) {
       console.error('[Data] FTP download error:', error);
-      let errorMsg = error.message;
-      if (error.name === 'AbortError') {
-        errorMsg = 'Request timed out. Check your internet connection.';
+      addFtpSample('dl', {
+        completed: false,
+      });
+      if (!silent) {
+        setTimeout(() => {
+          Alert.alert('FTP Download Failed', error.message || 'Unknown error occurred');
+        }, 100);
       }
-      Alert.alert('Error', `FTP download failed: ${errorMsg}`);
     } finally {
       setIsTesting(false);
     }
   };
 
-  // FTP Upload test
-  const testFtpUpload = async () => {
-    if (isTesting) return;
-    
+  // FTP Upload test (real FTP via native client)
+  const testFtpUpload = async (silent = false) => {
+    if (isTesting && !silent) return;
+
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
-      Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      if (!silent) {
+        Alert.alert('No Internet', 'Please check your internet connection and try again.');
+      }
       return;
     }
-    
+
+    const FTP = getFTPClient();
+    if (!FTP) {
+      if (!silent) {
+        Alert.alert(
+          'FTP not available',
+          'FTP tests require a custom build of the app (expo run:android / ios).',
+        );
+      }
+      return;
+    }
+
     setIsTesting(true);
     addFtpSample('ul', { request: true });
 
     try {
-      // Simulate FTP upload using HTTP POST
-      const testDataSize = 100 * 1024; // 100KB
-      const testData = new Uint8Array(testDataSize);
-      for (let i = 0; i < testDataSize; i++) {
-        testData[i] = Math.floor(Math.random() * 256);
-      }
-      const blob = new Blob([testData]);
-
-      const uploadUrl = 'https://httpbin.org/post';
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
-      
-      const startTime = Date.now();
-      const response = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/octet-stream',
-        },
-        body: blob,
-        signal: controller.signal,
+      // Setup FTP connection
+      FTP.setup({
+        ip_address: FTP_CONFIG.host,
+        port: FTP_CONFIG.port,
+        username: FTP_CONFIG.username,
+        password: FTP_CONFIG.password,
       });
-      clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      const testDataSize = 100 * 1024; // 100KB
+      const testData = 'x'.repeat(testDataSize);
+      const localPath = `${FileSystem.cacheDirectory}ftp-upload-test.txt`;
 
-      const uploadTime = Date.now() - startTime;
+      // Write dummy file to upload
+      await FileSystem.writeAsStringAsync(localPath, testData);
+
+      // Strip file:// prefix for native module compatibility
+      const cleanLocalPath = localPath.replace('file://', '');
+
+      const startTime = Date.now();
+      
+      // Add timeout wrapper for FTP upload
+      const uploadPromise = FTP.uploadFile(cleanLocalPath, FTP_CONFIG.uploadPath);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('FTP upload timeout after 30 seconds')), 30000)
+      );
+      
+      await Promise.race([uploadPromise, timeoutPromise]);
+      const uploadTime = Date.now() - startTime || 1;
+
       const throughputKbps = uploadTime > 0
         ? (testDataSize * 8 * 1000) / uploadTime
         : 0;
@@ -773,14 +872,27 @@ export default function DataScreen() {
         throughputKbps: throughputKbps,
       });
 
-      Alert.alert('Success', `FTP Upload completed: ${(throughputKbps / 1000).toFixed(2)} Mbps`);
+      if (!silent) {
+        setTimeout(() => {
+          Alert.alert(
+            'FTP Upload Success',
+            `Throughput: ${(throughputKbps / 1000).toFixed(2)} Mbps\nSize: ${(testDataSize / 1024).toFixed(2)} KB`,
+          );
+        }, 100);
+      }
+
+      // Clean up local file
+      await FileSystem.deleteAsync(localPath, { idempotent: true });
     } catch (error) {
       console.error('[Data] FTP upload error:', error);
-      let errorMsg = error.message;
-      if (error.name === 'AbortError') {
-        errorMsg = 'Request timed out. Check your internet connection.';
+      addFtpSample('ul', {
+        completed: false,
+      });
+      if (!silent) {
+        setTimeout(() => {
+          Alert.alert('FTP Upload Failed', error.message || 'Unknown error occurred');
+        }, 100);
       }
-      Alert.alert('Error', `FTP upload failed: ${errorMsg}`);
     } finally {
       setIsTesting(false);
     }
@@ -789,7 +901,7 @@ export default function DataScreen() {
   // Latency & Interactivity test
   const testLatency = async (silent = false) => {
     if (isTesting && !silent) return;
-    
+
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
       if (!silent) {
@@ -797,7 +909,7 @@ export default function DataScreen() {
       }
       return;
     }
-    
+
     if (!silent) {
       // Open WebView modal for visual latency test
       console.log('[Data] Opening WebView for latency test');
@@ -805,8 +917,8 @@ export default function DataScreen() {
       setWebViewVisible(true);
       return;
     }
-    
-    setIsTesting(true);
+
+    if (!silent) setIsTesting(true);
     addLatencySample({ request: true });
 
     try {
@@ -816,7 +928,7 @@ export default function DataScreen() {
         'https://httpbin.org/get',
         'https://jsonplaceholder.typicode.com/posts/1',
       ];
-      
+
       const latencies = [];
       let successCount = 0;
 
@@ -824,7 +936,7 @@ export default function DataScreen() {
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 5000);
-          
+
           const startTime = Date.now();
           const response = await fetch(url, {
             method: 'GET',
@@ -832,9 +944,9 @@ export default function DataScreen() {
             signal: controller.signal,
           });
           clearTimeout(timeoutId);
-          
+
           const latency = Date.now() - startTime;
-          
+
           if (response.ok) {
             successCount++;
             latencies.push(latency);
@@ -848,10 +960,10 @@ export default function DataScreen() {
       // Score based on: success ratio (50%) + average latency (50%)
       // Lower latency = higher score, max score at <100ms, min at >1000ms
       const successRatio = testUrls.length > 0 ? successCount / testUrls.length : 0;
-      const avgLatency = latencies.length > 0 
-        ? latencies.reduce((a, b) => a + b, 0) / latencies.length 
+      const avgLatency = latencies.length > 0
+        ? latencies.reduce((a, b) => a + b, 0) / latencies.length
         : 1000;
-      
+
       // Latency score: 100 at <100ms, 0 at >1000ms
       const latencyScore = Math.max(0, Math.min(100, 100 - ((avgLatency - 100) / 9)));
       const interactivityScore = Math.round((successRatio * 50) + (latencyScore * 0.5));
@@ -861,12 +973,24 @@ export default function DataScreen() {
         score: interactivityScore,
       });
 
-      Alert.alert('Success', `Interactivity test completed\nScore: ${interactivityScore}/100\nAvg Latency: ${Math.round(avgLatency)}ms`);
+      if (!silent) {
+        setTimeout(() => {
+          Alert.alert(
+            'Interactivity Test',
+            `Score: ${interactivityScore}/100\nAvg Latency: ${Math.round(avgLatency)}ms`,
+          );
+        }, 100);
+      }
+
     } catch (error) {
       console.error('[Data] Latency test error:', error);
-      Alert.alert('Error', `Latency test failed: ${error.message}`);
+      if (!silent) {
+        setTimeout(() => {
+          Alert.alert('Interactivity Test Failed', error.message || 'Unknown error');
+        }, 100);
+      }
     } finally {
-      setIsTesting(false);
+      if (!silent) setIsTesting(false);
     }
   };
 
@@ -874,299 +998,299 @@ export default function DataScreen() {
     <View style={{ flex: 1 }}>
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         <Text style={styles.title}>Data QoE</Text>
-      <Text style={styles.subtitle}>
-        Test browsing, streaming, file access, and social media performance metrics.
-      </Text>
-      
-      {/* Network Status Indicator */}
-      {networkState && (
-        <View style={styles.networkStatus}>
-          <View style={[
-            styles.networkIndicator, 
-            { backgroundColor: networkState.isConnected ? theme.colors.success : theme.colors.danger }
-          ]} />
-          <Text style={styles.networkText}>
-            {networkState.isConnected 
-              ? `Connected (${networkState.type})` 
-              : 'No Internet Connection'}
+        <Text style={styles.subtitle}>
+          Test browsing, streaming, file access, and social media performance metrics.
+        </Text>
+
+        {/* Network Status Indicator */}
+        {networkState && (
+          <View style={styles.networkStatus}>
+            <View style={[
+              styles.networkIndicator,
+              { backgroundColor: networkState.isConnected ? theme.colors.success : theme.colors.danger }
+            ]} />
+            <Text style={styles.networkText}>
+              {networkState.isConnected
+                ? `Connected (${networkState.type})`
+                : 'No Internet Connection'}
+            </Text>
+          </View>
+        )}
+
+        {/* Browsing Metrics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Do Full test</Text>
+          <BrandedButton
+            title="Full test"
+            onPress={fulltest}
+            disabled={isTesting}
+            loading={isTesting}
+          />
+        </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Browsing</Text>
+          <BrandedButton
+            title="Test Browsing"
+            onPress={() => {
+              console.log('[Data] Test Browsing button pressed');
+              testBrowsing();
+            }}
+            disabled={isTesting}
+          />
+          <View style={styles.metricsBox}>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Requests</Text>
+              <Text style={styles.metricValue}>{metrics.data.browsing.requests}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Completed</Text>
+              <Text style={styles.metricValue}>{metrics.data.browsing.completed}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Success Ratio</Text>
+              <Text style={styles.metricValue}>
+                {formatPercent(scores.browsing?.successRatio)}
+              </Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Avg Duration</Text>
+              <Text style={styles.metricValue}>
+                {formatTime(scores.browsing?.durationAvg)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Streaming Metrics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Streaming</Text>
+          <BrandedButton
+            title="Test Streaming"
+            onPress={() => {
+              console.log('[Data] Test Streaming button pressed');
+              testStreaming();
+            }}
+            disabled={isTesting}
+          />
+          <View style={styles.metricsBox}>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Requests</Text>
+              <Text style={styles.metricValue}>{metrics.data.streaming.requests}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Completed</Text>
+              <Text style={styles.metricValue}>{metrics.data.streaming.completed}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Success Ratio</Text>
+              <Text style={styles.metricValue}>
+                {formatPercent(scores.streaming?.successRatio)}
+              </Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Avg Setup Time</Text>
+              <Text style={styles.metricValue}>
+                {formatTime(scores.streaming?.setupAvg)}
+              </Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Avg MOS</Text>
+              <Text style={styles.metricValue}>
+                {scores.streaming?.mosAvg?.toFixed(2) || '--'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* HTTP Metrics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>File Access (HTTP)</Text>
+          <View style={styles.buttonRow}>
+            <BrandedButton
+              title="Test Download"
+              onPress={testHttpDownload}
+              disabled={isTesting}
+              style={{ flex: 1 }}
+            />
+            <BrandedButton
+              title="Test Upload"
+              onPress={testHttpUpload}
+              disabled={isTesting}
+              style={{ flex: 1 }}
+            />
+          </View>
+          <View style={styles.metricsBox}>
+            <Text style={styles.subsectionTitle}>Download</Text>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Requests</Text>
+              <Text style={styles.metricValue}>{metrics.data.http.dl.requests}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Completed</Text>
+              <Text style={styles.metricValue}>{metrics.data.http.dl.completed}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Avg Throughput</Text>
+              <Text style={styles.metricValue}>
+                {formatThroughput((scores.http?.dlAvg || 0) * 1000)}
+              </Text>
+            </View>
+
+            <View style={styles.divider} />
+
+            <Text style={styles.subsectionTitle}>Upload</Text>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Requests</Text>
+              <Text style={styles.metricValue}>{metrics.data.http.ul.requests}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Completed</Text>
+              <Text style={styles.metricValue}>{metrics.data.http.ul.completed}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Avg Throughput</Text>
+              <Text style={styles.metricValue}>
+                {formatThroughput((scores.http?.ulAvg || 0) * 1000)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Social Media Metrics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Social Media</Text>
+          <BrandedButton
+            title="Test Social Media"
+            onPress={testSocialMedia}
+            disabled={isTesting}
+          />
+          <View style={styles.metricsBox}>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Requests</Text>
+              <Text style={styles.metricValue}>{metrics.data.social.requests}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Completed</Text>
+              <Text style={styles.metricValue}>{metrics.data.social.completed}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Success Ratio</Text>
+              <Text style={styles.metricValue}>
+                {formatPercent(scores.social?.successRatio)}
+              </Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Avg Duration</Text>
+              <Text style={styles.metricValue}>
+                {formatTime(scores.social?.durationAvg)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* FTP Metrics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>File Access (FTP)</Text>
+          <View style={styles.buttonRow}>
+            <BrandedButton
+              title="Test FTP Download"
+              onPress={testFtpDownload}
+              disabled={isTesting}
+              style={{ flex: 1 }}
+            />
+            <BrandedButton
+              title="Test FTP Upload"
+              onPress={testFtpUpload}
+              disabled={isTesting}
+              style={{ flex: 1 }}
+            />
+          </View>
+          <View style={styles.metricsBox}>
+            <Text style={styles.subsectionTitle}>Download</Text>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Requests</Text>
+              <Text style={styles.metricValue}>{metrics.data.ftp.dl.requests}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Completed</Text>
+              <Text style={styles.metricValue}>{metrics.data.ftp.dl.completed}</Text>
+            </View>
+            <View style={styles.divider} />
+            <Text style={styles.subsectionTitle}>Upload</Text>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Requests</Text>
+              <Text style={styles.metricValue}>{metrics.data.ftp.ul.requests}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Completed</Text>
+              <Text style={styles.metricValue}>{metrics.data.ftp.ul.completed}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Latency & Interactivity Metrics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Latency & Interactivity</Text>
+          <BrandedButton
+            title="Test Interactivity"
+            onPress={() => {
+              console.log('[Data] Test Interactivity button pressed');
+              testLatency();
+            }}
+            disabled={isTesting}
+          />
+          <View style={styles.metricsBox}>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Requests</Text>
+              <Text style={styles.metricValue}>{metrics.data.latency.requests}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Completed</Text>
+              <Text style={styles.metricValue}>{metrics.data.latency.completed}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Success Ratio</Text>
+              <Text style={styles.metricValue}>
+                {formatPercent(metrics.data.latency.requests > 0
+                  ? metrics.data.latency.completed / metrics.data.latency.requests
+                  : null)}
+              </Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>Avg Score</Text>
+              <Text style={styles.metricValue}>
+                {metrics.data.latency.scores.length > 0
+                  ? Math.round(metrics.data.latency.scores.reduce((a, b) => a + b, 0) / metrics.data.latency.scores.length)
+                  : '--'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Data Score Summary */}
+        <View style={styles.summaryBox}>
+          <Text style={styles.sectionTitle}>Data QoE Score</Text>
+          <Text style={styles.scoreValue}>
+            {formatPercent(scores.data.score)}
+          </Text>
+          <Text style={styles.coverageText}>
+            Coverage: {formatPercent(scores.data.appliedWeight)}
           </Text>
         </View>
-      )}
+      </ScrollView>
 
-      {/* Browsing Metrics */}
-       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Do Full test</Text>
-         <BrandedButton 
-          title="Full test" 
-          onPress={fulltest} 
-          disabled={isTesting}
-          loading={isTesting}
-        />
-       </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Browsing</Text>
-        <BrandedButton 
-          title="Test Browsing" 
-          onPress={() => {
-            console.log('[Data] Test Browsing button pressed');
-            testBrowsing();
-          }} 
-          disabled={isTesting}
-        />
-        <View style={styles.metricsBox}>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Requests</Text>
-            <Text style={styles.metricValue}>{metrics.data.browsing.requests}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Completed</Text>
-            <Text style={styles.metricValue}>{metrics.data.browsing.completed}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Success Ratio</Text>
-            <Text style={styles.metricValue}>
-              {formatPercent(scores.browsing?.successRatio)}
-            </Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Avg Duration</Text>
-            <Text style={styles.metricValue}>
-              {formatTime(scores.browsing?.durationAvg)}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Streaming Metrics */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Streaming</Text>
-        <BrandedButton 
-          title="Test Streaming" 
-          onPress={() => {
-            console.log('[Data] Test Streaming button pressed');
-            testStreaming();
-          }} 
-          disabled={isTesting}
-        />
-        <View style={styles.metricsBox}>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Requests</Text>
-            <Text style={styles.metricValue}>{metrics.data.streaming.requests}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Completed</Text>
-            <Text style={styles.metricValue}>{metrics.data.streaming.completed}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Success Ratio</Text>
-            <Text style={styles.metricValue}>
-              {formatPercent(scores.streaming?.successRatio)}
-            </Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Avg Setup Time</Text>
-            <Text style={styles.metricValue}>
-              {formatTime(scores.streaming?.setupAvg)}
-            </Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Avg MOS</Text>
-            <Text style={styles.metricValue}>
-              {scores.streaming?.mosAvg?.toFixed(2) || '--'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* HTTP Metrics */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>File Access (HTTP)</Text>
-        <View style={styles.buttonRow}>
-          <BrandedButton 
-            title="Test Download" 
-            onPress={testHttpDownload} 
-            disabled={isTesting}
-            style={{ flex: 1 }}
-          />
-          <BrandedButton 
-            title="Test Upload" 
-            onPress={testHttpUpload} 
-            disabled={isTesting}
-            style={{ flex: 1 }}
-          />
-        </View>
-        <View style={styles.metricsBox}>
-          <Text style={styles.subsectionTitle}>Download</Text>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Requests</Text>
-            <Text style={styles.metricValue}>{metrics.data.http.dl.requests}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Completed</Text>
-            <Text style={styles.metricValue}>{metrics.data.http.dl.completed}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Avg Throughput</Text>
-            <Text style={styles.metricValue}>
-              {formatThroughput((scores.http?.dlAvg || 0) * 1000)}
-            </Text>
-          </View>
-
-          <View style={styles.divider} />
-          
-          <Text style={styles.subsectionTitle}>Upload</Text>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Requests</Text>
-            <Text style={styles.metricValue}>{metrics.data.http.ul.requests}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Completed</Text>
-            <Text style={styles.metricValue}>{metrics.data.http.ul.completed}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Avg Throughput</Text>
-            <Text style={styles.metricValue}>
-              {formatThroughput((scores.http?.ulAvg || 0) * 1000)}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Social Media Metrics */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Social Media</Text>
-        <BrandedButton 
-          title="Test Social Media" 
-          onPress={testSocialMedia} 
-          disabled={isTesting}
-        />
-        <View style={styles.metricsBox}>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Requests</Text>
-            <Text style={styles.metricValue}>{metrics.data.social.requests}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Completed</Text>
-            <Text style={styles.metricValue}>{metrics.data.social.completed}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Success Ratio</Text>
-            <Text style={styles.metricValue}>
-              {formatPercent(scores.social?.successRatio)}
-            </Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Avg Duration</Text>
-            <Text style={styles.metricValue}>
-              {formatTime(scores.social?.durationAvg)}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* FTP Metrics */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>File Access (FTP)</Text>
-        <View style={styles.buttonRow}>
-          <BrandedButton 
-            title="Test FTP Download" 
-            onPress={testFtpDownload} 
-            disabled={isTesting}
-            style={{ flex: 1 }}
-          />
-          <BrandedButton 
-            title="Test FTP Upload" 
-            onPress={testFtpUpload} 
-            disabled={isTesting}
-            style={{ flex: 1 }}
-          />
-        </View>
-        <View style={styles.metricsBox}>
-          <Text style={styles.subsectionTitle}>Download</Text>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Requests</Text>
-            <Text style={styles.metricValue}>{metrics.data.ftp.dl.requests}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Completed</Text>
-            <Text style={styles.metricValue}>{metrics.data.ftp.dl.completed}</Text>
-          </View>
-          <View style={styles.divider} />
-          <Text style={styles.subsectionTitle}>Upload</Text>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Requests</Text>
-            <Text style={styles.metricValue}>{metrics.data.ftp.ul.requests}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Completed</Text>
-            <Text style={styles.metricValue}>{metrics.data.ftp.ul.completed}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Latency & Interactivity Metrics */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Latency & Interactivity</Text>
-        <BrandedButton 
-          title="Test Interactivity" 
-          onPress={() => {
-            console.log('[Data] Test Interactivity button pressed');
-            testLatency();
-          }}
-          disabled={isTesting}
-        />
-        <View style={styles.metricsBox}>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Requests</Text>
-            <Text style={styles.metricValue}>{metrics.data.latency.requests}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Completed</Text>
-            <Text style={styles.metricValue}>{metrics.data.latency.completed}</Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Success Ratio</Text>
-            <Text style={styles.metricValue}>
-              {formatPercent(metrics.data.latency.requests > 0 
-                ? metrics.data.latency.completed / metrics.data.latency.requests 
-                : null)}
-            </Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Avg Score</Text>
-            <Text style={styles.metricValue}>
-              {metrics.data.latency.scores.length > 0
-                ? Math.round(metrics.data.latency.scores.reduce((a, b) => a + b, 0) / metrics.data.latency.scores.length)
-                : '--'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Data Score Summary */}
-      <View style={styles.summaryBox}>
-        <Text style={styles.sectionTitle}>Data QoE Score</Text>
-        <Text style={styles.scoreValue}>
-          {formatPercent(scores.data.score)}
-        </Text>
-        <Text style={styles.coverageText}>
-          Coverage: {formatPercent(scores.data.appliedWeight)}
-      </Text>
-      </View>
-    </ScrollView>
-
-    {/* WebView Speed Test Modal */}
-    <SpeedTestWebView
-      visible={webViewVisible}
-      onClose={() => {
-        console.log('[Data] Closing WebView');
-        setWebViewVisible(false);
-        setWebViewTestType(null);
-      }}
-      testType={webViewTestType}
-      onTestComplete={handleWebViewTestComplete}
-    />
-  </View>
+      {/* WebView Speed Test Modal */}
+      <SpeedTestWebView
+        visible={webViewVisible}
+        onClose={() => {
+          console.log('[Data] Closing WebView');
+          setWebViewVisible(false);
+          setWebViewTestType(null);
+        }}
+        testType={webViewTestType}
+        onTestComplete={handleWebViewTestComplete}
+      />
+    </View>
   );
 }
 
