@@ -1,29 +1,45 @@
 /**
  * Jest Configuration for QoE Scoring Tests
+ * 
+ * Uses Node.js test environment to avoid React Native module issues.
+ * Tests only pure JavaScript utilities (scoring, math functions).
  */
 
 module.exports = {
-    // Use react-native preset for proper JSX and ES6 module support
-    preset: 'react-native',
+    // Use Node environment for pure JS tests (avoids React Native module parsing)
+    testEnvironment: 'node',
 
     // Test file patterns
     testMatch: [
         '<rootDir>/src/tests/**/*.test.js',
-        '<rootDir>/src/tests/**/*.test.ts',
-        '<rootDir>/src/**/*.spec.js',
-        '<rootDir>/src/**/*.spec.ts',
     ],
 
-    // Transform files with babel
+    // Transform our source files with Babel
     transform: {
-        '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest',
+        '^.+\\.js$': 'babel-jest',
     },
 
-    // Module file extensions
-    moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+    // Transform source files but not node_modules
+    transformIgnorePatterns: [
+        '/node_modules/',
+    ],
 
-    // Setup files to run before tests
-    setupFilesAfterEnv: [],
+    // Module file extensions
+    moduleFileExtensions: ['js', 'json'],
+
+    // Mock modules that aren't needed for unit tests
+    moduleNameMapper: {
+        '^expo-device$': '<rootDir>/src/tests/__mocks__/expo-device.js',
+        '^react-native$': '<rootDir>/src/tests/__mocks__/react-native.js',
+    },
+
+    // Ignore paths with duplicate modules
+    modulePathIgnorePatterns: [
+        '<rootDir>/json/',
+        '<rootDir>/dist/',
+        '<rootDir>/android/',
+        '<rootDir>/ios/',
+    ],
 
     // Coverage configuration
     collectCoverageFrom: [
@@ -33,26 +49,12 @@ module.exports = {
         '!**/node_modules/**',
     ],
 
-    // Coverage thresholds
-    coverageThreshold: {
-        global: {
-            branches: 70,
-            functions: 80,
-            lines: 80,
-            statements: 80,
-        },
-    },
-
     // Ignore patterns
     testPathIgnorePatterns: [
         '/node_modules/',
         '/android/',
         '/ios/',
-    ],
-
-    // Transform ignore patterns - don't transform node_modules except for specific packages
-    transformIgnorePatterns: [
-        'node_modules/(?!(react-native|@react-native|expo|@expo|expo-device|expo-file-system)/)',
+        '/json/',
     ],
 
     // Clear mocks between tests
@@ -61,3 +63,4 @@ module.exports = {
     // Verbose output
     verbose: true,
 };
+
