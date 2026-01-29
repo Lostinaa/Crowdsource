@@ -6,28 +6,48 @@
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
-// Auto-detect backend URL based on platform
+/**
+ * Determines the appropriate backend URL based on environment and platform.
+ * 
+ * Priority:
+ * 1. Environment variable EXPO_PUBLIC_BACKEND_URL (if set)
+ * 2. Android emulator special IP (10.0.2.2)
+ * 3. iOS simulator localhost
+ * 4. Default fallback (localhost)
+ * 
+ * For real devices, you MUST set EXPO_PUBLIC_BACKEND_URL in your .env file
+ * to your server's actual IP address or domain.
+ */
 const getDefaultBackendUrl = () => {
-  // Check environment variable first
+  // Check environment variable first (recommended for all environments)
   if (process.env.EXPO_PUBLIC_BACKEND_URL) {
     return process.env.EXPO_PUBLIC_BACKEND_URL;
   }
-  
+
   // For Android emulator, use 10.0.2.2 (special IP that maps to host's localhost)
   if (Platform.OS === 'android' && !Device.isDevice) {
     return 'http://10.0.2.2:8000/api';
   }
-  
-  // For real devices, use the actual IP address
-  // Default to the current machine's IP (update this if your IP changes)
-  return 'http://172.25.210.174:8000/api';
+
+  // For iOS simulator, use localhost
+  if (Platform.OS === 'ios' && !Device.isDevice) {
+    return 'http://localhost:8000/api';
+  }
+
+  // For real devices without env config, warn and use localhost (will likely fail)
+  // Users should configure EXPO_PUBLIC_BACKEND_URL in .env
+  console.warn(
+    '[BackendAPI] No EXPO_PUBLIC_BACKEND_URL configured. ' +
+    'For real devices, create a .env file with EXPO_PUBLIC_BACKEND_URL=http://YOUR_SERVER_IP:8000/api'
+  );
+  return 'http://localhost:8000/api';
 };
 
 const DEFAULT_BACKEND_URL = getDefaultBackendUrl();
 
 // Log the detected URL for debugging
-console.log('[BackendAPI] Initialized with URL:', DEFAULT_BACKEND_URL, 
-  Platform.OS === 'android' && !Device.isDevice ? '(Android Emulator)' : '(Real Device)');
+console.log('[BackendAPI] Initialized with URL:', DEFAULT_BACKEND_URL,
+  Device.isDevice ? '(Real Device)' : `(${Platform.OS} Emulator/Simulator)`);
 
 class BackendApiClient {
   constructor(baseUrl = DEFAULT_BACKEND_URL, apiKey = null) {
@@ -61,11 +81,11 @@ class BackendApiClient {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-    
+
     if (this.apiKey) {
       headers['Authorization'] = `Bearer ${this.apiKey}`;
     }
-    
+
     return headers;
   }
 
@@ -258,7 +278,7 @@ class BackendApiClient {
 
       const url = `${this.baseUrl}/coverage-samples${params.toString() ? '?' + params.toString() : ''}`;
       console.log('[BackendAPI] Fetching coverage samples:', url);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: this.getHeaders(),
@@ -346,7 +366,7 @@ class BackendApiClient {
       });
 
       console.log('[BackendAPI] Health check response:', response.status, response.statusText);
-      
+
       return {
         success: response.ok,
         status: response.status,
