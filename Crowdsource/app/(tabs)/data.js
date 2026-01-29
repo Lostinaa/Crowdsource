@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, Button, ScrollView, Alert, TouchableOpacity } from 'react-native';
-import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Button, ScrollView, Alert, TouchableOpacity, InteractionManager } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import * as FileSystem from 'expo-file-system';
 import { useQoE } from '../../src/context/QoEContext';
@@ -30,6 +30,11 @@ export default function DataScreen() {
   const [webViewVisible, setWebViewVisible] = useState(false);
   const [webViewTestType, setWebViewTestType] = useState(null);
 
+
+  // Reset completion ref when opening WebView so next test can complete once
+  useEffect(() => {
+    if (webViewVisible) webViewCompletedRef.current = false;
+  }, [webViewVisible]);
 
   // Debug: Log state changes
   useEffect(() => {
@@ -138,32 +143,67 @@ export default function DataScreen() {
     }
   };
 
-  // Handle WebView test completion
+  // Handle WebView test completion — close modal first, then show alert to avoid white screen
   const handleWebViewTestComplete = (result) => {
-    if (webViewTestType === 'browsing') {
-      addBrowsingSample({
-        request: true,
-        completed: result.success,
-        durationMs: result.duration,
-        dnsResolutionTimeMs: result.dnsTime,
-      });
-    } else if (webViewTestType === 'video') {
-      addStreamingSample({
-        request: true,
-        completed: result.success,
-        setupTimeMs: result.duration,
-      });
-    } else if (webViewTestType === 'latency') {
-      // Calculate interactivity score from latency
-      const latencyScore = result.duration < 100 ? 100 : Math.max(0, 100 - ((result.duration - 100) / 9));
-      addLatencySample({
-        request: true,
-        completed: result.success,
-        score: Math.round(latencyScore),
-      });
-    }
+    if (webViewCompletedRef.current) return; // Prevent double-handling (e.g. handleLoadEnd + handleMessage)
+    webViewCompletedRef.current = true;
+
+    const completedType = webViewTestType;
+    console.log('[Data] WebView test complete:', completedType, result);
+
+    // Close modal immediately so the underlying screen is visible before any alert
     setWebViewVisible(false);
     setWebViewTestType(null);
+
+    try {
+      if (completedType === 'browsing') {
+        addBrowsingSample({
+          request: true,
+          completed: result.success,
+          durationMs: result.duration,
+          dnsResolutionTimeMs: result.dnsTime,
+        });
+        InteractionManager.runAfterInteractions(() => {
+          Alert.alert(
+            'Browsing Test',
+            result.success
+              ? `Completed in ${(result.duration / 1000).toFixed(2)}s\nDNS: ${(result.dnsTime / 1000).toFixed(2)}s`
+              : `Failed: ${result.error || 'Unknown error'}`,
+          );
+        });
+      } else if (completedType === 'video') {
+        addStreamingSample({
+          request: true,
+          completed: result.success,
+          setupTimeMs: result.duration,
+        });
+        InteractionManager.runAfterInteractions(() => {
+          Alert.alert(
+            'Streaming Test',
+            result.success
+              ? `Setup time: ${(result.duration / 1000).toFixed(2)}s`
+              : `Failed: ${result.error || 'Unknown error'}`,
+          );
+        });
+      } else if (completedType === 'latency') {
+        const latencyScore = result.duration < 100 ? 100 : Math.max(0, 100 - ((result.duration - 100) / 9));
+        addLatencySample({
+          request: true,
+          completed: result.success,
+          score: Math.round(latencyScore),
+        });
+        InteractionManager.runAfterInteractions(() => {
+          Alert.alert(
+            'Latency Test',
+            result.success
+              ? `Score: ${Math.round(latencyScore)}/100\nLatency: ${(result.duration / 1000).toFixed(2)}s`
+              : `Failed: ${result.error || 'Unknown error'}`,
+          );
+        });
+      }
+    } catch (error) {
+      console.error('[Data] Error in handleWebViewTestComplete:', error);
+    }
   };
   const fulltest = async () => {
     if (isTesting) return;
@@ -378,13 +418,13 @@ export default function DataScreen() {
         resolution: resolution,
       });
 
+      console.log('[Data] Streaming test success (silent mode), silent:', silent);
       if (!silent) {
-        setTimeout(() => {
-          Alert.alert(
-            'Streaming Test',
-            `Throughput: ${(throughputKbps / 1000).toFixed(2)} Mbps\nMOS: ${mos.toFixed(2)}\nResolution: ${resolution}`,
-          );
-        }, 100);
+        console.log('[Data] Showing streaming test alert');
+        Alert.alert(
+          'Streaming Test',
+          `Throughput: ${(throughputKbps / 1000).toFixed(2)} Mbps\nMOS: ${mos.toFixed(2)}\nResolution: ${resolution}`,
+        );
       }
     } catch (error) {
       console.error('[Data] Streaming test error:', error);
@@ -395,9 +435,8 @@ export default function DataScreen() {
         } else if (error.message === 'Network request failed') {
           errorMsg = 'Network request failed. Check your internet connection.';
         }
-        setTimeout(() => {
-          Alert.alert('Streaming Test Failed', errorMsg);
-        }, 100);
+        console.log('[Data] Showing streaming test error alert');
+        Alert.alert('Streaming Test Failed', errorMsg);
       }
     } finally {
       if (!silent) setIsTesting(false);
@@ -492,13 +531,13 @@ export default function DataScreen() {
         throughputMbps: throughputMbps,
       });
 
+      console.log('[Data] HTTP download success, silent:', silent, 'throughputMbps:', throughputMbps);
       if (!silent) {
-        setTimeout(() => {
-          Alert.alert(
-            'HTTP Download Result',
-            `Throughput: ${throughputMbps.toFixed(2)} Mbps\nSize: ${(sizeBytes / 1024).toFixed(2)} KB`,
-          );
-        }, 100);
+        console.log('[Data] Showing HTTP download alert');
+        Alert.alert(
+          'HTTP Download Result',
+          `Throughput: ${throughputMbps.toFixed(2)} Mbps\nSize: ${(sizeBytes / 1024).toFixed(2)} KB`,
+        );
       }
     } catch (error) {
       console.error('[Data] HTTP download error:', error);
@@ -509,9 +548,8 @@ export default function DataScreen() {
         } else if (error.message === 'Network request failed') {
           errorMsg = 'Network request failed. Check your internet connection.';
         }
-        setTimeout(() => {
-          Alert.alert('HTTP Download Failed', errorMsg);
-        }, 100);
+        console.log('[Data] Showing HTTP download error alert');
+        Alert.alert('HTTP Download Failed', errorMsg);
       }
     } finally {
       if (!silent) setIsTesting(false);
@@ -566,7 +604,7 @@ export default function DataScreen() {
 
       // Calculate throughput in Mbps
       const throughputMbps = uploadTime > 0
-        ? (testDataSize * 8) / (uploadTime * 1000) // Convert bytes to bits, then to Mbps
+        ? (testDataSize * 8 * 1000) / (uploadTime * 1000000) // Convert bytes to bits, ms to seconds, then to Mbps
         : 0;
 
       addHttpSample('ul', {
@@ -574,13 +612,13 @@ export default function DataScreen() {
         throughputMbps: throughputMbps,
       });
 
+      console.log('[Data] HTTP upload success, silent:', silent);
       if (!silent) {
-        setTimeout(() => {
-          Alert.alert(
-            'HTTP Upload Result',
-            `Throughput: ${throughputMbps.toFixed(2)} Mbps\nSize: ${(testDataSize / 1024).toFixed(2)} KB`,
-          );
-        }, 100);
+        console.log('[Data] Showing HTTP upload alert');
+        Alert.alert(
+          'HTTP Upload Result',
+          `Throughput: ${throughputMbps.toFixed(2)} Mbps\nSize: ${(testDataSize / 1024).toFixed(2)} KB`,
+        );
       }
     } catch (error) {
       console.error('[Data] HTTP upload error:', error);
@@ -591,9 +629,8 @@ export default function DataScreen() {
         } else if (error.message === 'Network request failed') {
           errorMsg = 'Network request failed. Check your internet connection.';
         }
-        setTimeout(() => {
-          Alert.alert('HTTP Upload Failed', errorMsg);
-        }, 100);
+        console.log('[Data] Showing HTTP upload error alert');
+        Alert.alert('HTTP Upload Failed', errorMsg);
       }
     } finally {
       if (!silent) setIsTesting(false);
@@ -689,10 +726,10 @@ export default function DataScreen() {
         throughputKbps: throughputKbps,
       });
 
+      console.log('[Data] Social media test success, silent:', silent);
       if (!silent) {
-        setTimeout(() => {
-          Alert.alert('Social Media Test', `Completed in ${(duration / 1000).toFixed(2)}s`);
-        }, 100);
+        console.log('[Data] Showing social media test alert');
+        Alert.alert('Social Media Test', `Completed in ${(duration / 1000).toFixed(2)}s`);
       }
     } catch (error) {
       console.error('[Data] Social media test error:', error);
@@ -703,9 +740,8 @@ export default function DataScreen() {
         } else if (error.message === 'Network request failed') {
           errorMsg = 'Network request failed. Check your internet connection.';
         }
-        setTimeout(() => {
-          Alert.alert('Social Media Test Failed', errorMsg);
-        }, 100);
+        console.log('[Data] Showing social media test error alert');
+        Alert.alert('Social Media Test Failed', errorMsg);
       }
     } finally {
       if (!silent) setIsTesting(false);
@@ -779,13 +815,13 @@ export default function DataScreen() {
         throughputKbps: throughputKbps,
       });
 
+      console.log('[Data] FTP download success, silent:', silent);
       if (!silent) {
-        setTimeout(() => {
-          Alert.alert(
-            'FTP Download Success',
-            `Throughput: ${(throughputKbps / 1000).toFixed(2)} Mbps\nSize: ${(sizeBytes / 1024).toFixed(2)} KB`,
-          );
-        }, 100);
+        console.log('[Data] Showing FTP download success alert');
+        Alert.alert(
+          'FTP Download Success',
+          `Throughput: ${(throughputKbps / 1000).toFixed(2)} Mbps\nSize: ${(sizeBytes / 1024).toFixed(2)} KB`,
+        );
       }
 
       // Clean up local file
@@ -798,9 +834,7 @@ export default function DataScreen() {
         completed: false,
       });
       if (!silent) {
-        setTimeout(() => {
-          Alert.alert('FTP Download Failed', error.message || 'Unknown error occurred');
-        }, 100);
+        Alert.alert('FTP Download Failed', error.message || 'Unknown error occurred');
       }
     } finally {
       setIsTesting(false);
@@ -809,7 +843,11 @@ export default function DataScreen() {
 
   // FTP Upload test (real FTP via native client)
   const testFtpUpload = async (silent = false) => {
-    if (isTesting && !silent) return;
+    console.log('[Data] testFtpUpload called, silent:', silent);
+    if (isTesting && !silent) {
+      console.log('[Data] Already testing FTP upload, returning');
+      return;
+    }
 
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
@@ -821,15 +859,18 @@ export default function DataScreen() {
 
     const FTP = getFTPClient();
     if (!FTP) {
+      console.log('[Data] FTP client not available for upload');
       if (!silent) {
         Alert.alert(
           'FTP not available',
           'FTP tests require a custom build of the app (expo run:android / ios).',
         );
       }
+      addFtpSample('ul', { request: true, completed: false });
       return;
     }
 
+    console.log('[Data] Starting FTP upload');
     setIsTesting(true);
     addFtpSample('ul', { request: true });
 
@@ -872,13 +913,13 @@ export default function DataScreen() {
         throughputKbps: throughputKbps,
       });
 
+      console.log('[Data] FTP upload success, silent:', silent);
       if (!silent) {
-        setTimeout(() => {
-          Alert.alert(
-            'FTP Upload Success',
-            `Throughput: ${(throughputKbps / 1000).toFixed(2)} Mbps\nSize: ${(testDataSize / 1024).toFixed(2)} KB`,
-          );
-        }, 100);
+        console.log('[Data] Showing FTP upload success alert');
+        Alert.alert(
+          'FTP Upload Success',
+          `Throughput: ${(throughputKbps / 1000).toFixed(2)} Mbps\nSize: ${(testDataSize / 1024).toFixed(2)} KB`,
+        );
       }
 
       // Clean up local file
@@ -888,12 +929,13 @@ export default function DataScreen() {
       addFtpSample('ul', {
         completed: false,
       });
+      console.log('[Data] FTP upload failed, silent:', silent, 'error:', error.message);
       if (!silent) {
-        setTimeout(() => {
-          Alert.alert('FTP Upload Failed', error.message || 'Unknown error occurred');
-        }, 100);
+        console.log('[Data] Showing FTP upload error alert');
+        Alert.alert('FTP Upload Failed', error.message || 'Unknown error occurred');
       }
     } finally {
+      console.log('[Data] FTP upload finally block, setting isTesting to false');
       setIsTesting(false);
     }
   };
@@ -973,21 +1015,20 @@ export default function DataScreen() {
         score: interactivityScore,
       });
 
+      console.log('[Data] Latency test success, silent:', silent);
       if (!silent) {
-        setTimeout(() => {
-          Alert.alert(
-            'Interactivity Test',
-            `Score: ${interactivityScore}/100\nAvg Latency: ${Math.round(avgLatency)}ms`,
-          );
-        }, 100);
+        console.log('[Data] Showing latency test alert');
+        Alert.alert(
+          'Interactivity Test',
+          `Score: ${interactivityScore}/100\nAvg Latency: ${Math.round(avgLatency)}ms`,
+        );
       }
 
     } catch (error) {
       console.error('[Data] Latency test error:', error);
       if (!silent) {
-        setTimeout(() => {
-          Alert.alert('Interactivity Test Failed', error.message || 'Unknown error');
-        }, 100);
+        console.log('[Data] Showing latency test error alert');
+        Alert.alert('Interactivity Test Failed', error.message || 'Unknown error');
       }
     } finally {
       if (!silent) setIsTesting(false);
