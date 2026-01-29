@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Button, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Button, ScrollView, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -139,6 +139,11 @@ export default function DataScreen() {
       }
     } catch (error) {
       console.error('[Data] Browsing test error:', error);
+      Alert.alert(
+        'Browsing Test Failed',
+        'Unable to complete the browsing test. Please check your internet connection and try again.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setIsTesting(false);
     }
@@ -368,6 +373,11 @@ export default function DataScreen() {
         }
       } catch (downloadError) {
         console.error('[Data] Streaming download error:', downloadError);
+        Alert.alert(
+          'Download Failed',
+          'Unable to download the test file. Please check your internet connection.',
+          [{ text: 'OK' }]
+        );
         // Fallback: estimate from setup time
         totalBytes = 100 * 1024; // Estimate 100KB
         streamTime = Date.now() - streamStart || 1000;
@@ -1059,6 +1069,14 @@ export default function DataScreen() {
           </View>
         )}
 
+        {/* Loading Indicator */}
+        {isTesting && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={styles.loadingText}>Running test...</Text>
+          </View>
+        )}
+
         {/* Browsing Metrics */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Do Full test</Text>
@@ -1449,6 +1467,24 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     marginTop: theme.spacing.xs,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.background.card,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    ...theme.shadows.sm,
+  },
+  loadingText: {
+    color: theme.colors.text.primary,
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: theme.spacing.sm,
   },
   coverageText: {
     color: theme.colors.text.secondary,
