@@ -24,48 +24,53 @@ export default function SpeedTestWebView({
   // Set test URL based on test type
   useEffect(() => {
     if (visible && testType) {
-      console.log('[SpeedTestWebView] Setting up test:', testType);
+      console.log('[SpeedTestWebView] Effect triggered for:', testType);
       setLoading(true);
+      setWebSource(null);
       setLoadTime(null);
       setDnsTime(null);
       setStartTime(Date.now());
       dnsStartRef.current = Date.now();
 
-      switch (testType) {
-        case 'browsing':
-          setWebSource({ uri: 'https://www.google.com' });
-          break;
-        case 'video': {
-          // Inline HTML with real video stream and multiple resolutions
-          const videoHtml = `
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>
-                  body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; }
-                  video { width: 100%; height: auto; max-height: 100vh; }
-                </style>
-              </head>
-              <body>
-                <video controls autoplay muted playsinline>
-                  <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
-                  Your device does not support HTML5 video.
-                </video>
-              </body>
-            </html>
-          `;
-          setWebSource({ html: videoHtml });
-          break;
+      // Delay source setting to allow Modal to animate and component to mount
+      const timer = setTimeout(() => {
+        let source = null;
+        switch (testType) {
+          case 'browsing':
+            source = { uri: 'https://example.com' };
+            break;
+          case 'video': {
+            const videoHtml = `
+              <!DOCTYPE html>
+              <html>
+                <head>
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <style>
+                    body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; }
+                    video { width: 100%; height: auto; max-height: 100vh; }
+                  </style>
+                </head>
+                <body>
+                  <video controls autoplay muted playsinline>
+                    <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+                  </video>
+                </body>
+              </html>
+            `;
+            source = { html: videoHtml };
+            break;
+          }
+          case 'latency':
+            source = { uri: 'https://www.wikipedia.org' };
+            break;
+          default:
+            source = { uri: 'https://example.com' };
         }
-        case 'latency':
-          // Simple lightweight page for latency test (use a full HTML page, not favicon)
-          setWebSource({ uri: 'https://www.google.com' });
-          break;
-        default:
-          setWebSource({ uri: 'https://www.google.com' });
-      }
-      console.log('[SpeedTestWebView] Source set for type:', testType);
+        console.log('[SpeedTestWebView] Setting webSource now:', source?.uri || 'HTML');
+        setWebSource(source);
+      }, 500);
+
+      return () => clearTimeout(timer);
     }
   }, [visible, testType]);
 
@@ -231,32 +236,35 @@ export default function SpeedTestWebView({
               </View>
 
               {/* WebView */}
-              {webSource ? (
-                <WebView
-                  ref={webViewRef}
-                  source={webSource}
-                  style={styles.webview}
-                  onLoadStart={handleLoadStart}
-                  onLoadEnd={handleLoadEnd}
-                  onError={handleError}
-                  onMessage={handleMessage}
-                  javaScriptEnabled={true}
-                  domStorageEnabled={true}
-                  startInLoadingState={true}
-                  cacheEnabled={false}
-                  mediaPlaybackRequiresUserAction={false}
-                  allowsInlineMediaPlayback={true}
-                  mixedContentMode="always"
-                  androidLayerType="software"
-                />
-              ) : (
-                <View style={[styles.webview, { justifyContent: 'center', alignItems: 'center' }]}>
-                  <ActivityIndicator size="large" color={theme.colors.primary} />
-                  <Text style={{ marginTop: theme.spacing.md, color: theme.colors.text.secondary }}>
-                    Preparing test...
-                  </Text>
-                </View>
-              )}
+              <View style={{ flex: 1 }}>
+                {webSource ? (
+                  <WebView
+                    ref={webViewRef}
+                    source={webSource}
+                    onLoadStart={handleLoadStart}
+                    onLoadEnd={handleLoadEnd}
+                    onError={handleError}
+                    onMessage={handleMessage}
+                    javaScriptEnabled={true}
+                    domStorageEnabled={true}
+                    startInLoadingState={true}
+                    cacheEnabled={false}
+                    mediaPlaybackRequiresUserAction={false}
+                    allowsInlineMediaPlayback={true}
+                    mixedContentMode="always"
+                    onHttpError={(e) => console.log('[SpeedTestWebView] HTTP Error:', e.nativeEvent)}
+                    onRenderProcessGone={(e) => console.log('[SpeedTestWebView] Render Process Gone:', e.nativeEvent)}
+                    style={[styles.webview, { opacity: 0.99 }]} // Opacity trick for Android rendering
+                  />
+                ) : (
+                  <View style={[styles.webview, { justifyContent: 'center', alignItems: 'center' }]}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={{ marginTop: theme.spacing.md, color: theme.colors.text.secondary }}>
+                      Preparing test...
+                    </Text>
+                  </View>
+                )}
+              </View>
 
               {/* Footer */}
               <View style={styles.footer}>
@@ -277,8 +285,8 @@ export default function SpeedTestWebView({
             </View>
           </TouchableWithoutFeedback>
         </View>
-      </TouchableWithoutFeedback>
-    </Modal>
+      </TouchableWithoutFeedback >
+    </Modal >
   );
 }
 
@@ -362,6 +370,7 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: theme.colors.background.primary,
+    overflow: 'hidden',
   },
   footer: {
     padding: theme.spacing.md,

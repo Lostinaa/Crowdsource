@@ -9,7 +9,7 @@ export const FTP_CONFIG = {
   password: 'rNrKYTX9g7z3RgJRmxWuGHbeu',
 
   // Remote paths used for tests
-  downloadPath: '/Test.txt',      // Small file for download test
+  downloadPath: '/readme.txt',      // Usually exists on public FTPs
   uploadPath: '/upload/cs-qoe-test-upload.txt', // Remote path for upload test
 
   // Real FTP is enabled – tests will use the native FTP client.

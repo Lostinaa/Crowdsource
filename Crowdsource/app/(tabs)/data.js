@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Button, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import NetInfo from '@react-native-community/netinfo';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
 import SpeedTestWebView from '../../src/components/SpeedTestWebView';
