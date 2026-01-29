@@ -60,11 +60,29 @@ const QoEContext = createContext(null);
 export const QoEProvider = ({ children }) => {
   const [metrics, setMetrics] = useState(createInitialMetrics);
   const [history, setHistory] = useState([]);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load history and metrics from storage on mount
+  // ... (Load effect handled in previous step)
+
+  // ... (Helper functions)
+
+  // Persist metrics to storage whenever they change
+  useEffect(() => {
+    if (!isLoaded) return; // Don't save until loaded to prevent overwrite
+
+    const saveMetrics = async () => {
+      try {
+        await AsyncStorage.setItem(METRICS_STORAGE_KEY, JSON.stringify(metrics));
+      } catch (error) {
+        console.error('[QoE] Failed to persist metrics:', error);
+      }
+    };
+    saveMetrics();
+  }, [metrics, isLoaded]); // Add isLoaded dependency
   useEffect(() => {
     const loadStoredData = async () => {
       try {
+        console.log('[QoE] Loading stored data...');
         // Load history
         const storedHistory = await AsyncStorage.getItem(HISTORY_STORAGE_KEY);
         if (storedHistory) {
@@ -74,10 +92,13 @@ export const QoEProvider = ({ children }) => {
         // Load metrics
         const storedMetrics = await AsyncStorage.getItem(METRICS_STORAGE_KEY);
         if (storedMetrics) {
+          console.log('[QoE] Found stored metrics, restoring...');
           setMetrics(JSON.parse(storedMetrics));
         }
       } catch (error) {
         console.error('[QoE] Failed to load stored data:', error);
+      } finally {
+        setIsLoaded(true);
       }
     };
     loadStoredData();
@@ -91,7 +112,7 @@ export const QoEProvider = ({ children }) => {
         metrics: JSON.parse(JSON.stringify(currentMetrics)), // Deep copy
         scores: JSON.parse(JSON.stringify(currentScores)), // Deep copy
       };
-      
+
       // Get current history from state, then update
       setHistory((prevHistory) => {
         const updatedHistory = [entry, ...prevHistory].slice(0, MAX_HISTORY_ENTRIES);
@@ -394,17 +415,7 @@ export const QoEProvider = ({ children }) => {
 
   const scores = useMemo(() => calculateScores(metrics), [metrics]);
 
-  // Persist metrics to storage whenever they change
-  useEffect(() => {
-    const saveMetrics = async () => {
-      try {
-        await AsyncStorage.setItem(METRICS_STORAGE_KEY, JSON.stringify(metrics));
-      } catch (error) {
-        console.error('[QoE] Failed to persist metrics:', error);
-      }
-    };
-    saveMetrics();
-  }, [metrics]);
+
 
   // Debug logging for data metrics
   useEffect(() => {

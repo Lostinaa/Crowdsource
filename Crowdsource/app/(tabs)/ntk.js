@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    PermissionsAndroid,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
-    Linking
+  ActivityIndicator,
+  Alert,
+  PermissionsAndroid,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  Linking
 } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
 import { theme } from '../../src/constants/theme';
@@ -59,7 +59,7 @@ export default function NetworkTab() {
 
         const granted = await PermissionsAndroid.requestMultiple(foregroundPerms);
 
-        const isFineLocationGranted = 
+        const isFineLocationGranted =
           granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] === PermissionsAndroid.RESULTS.GRANTED;
 
         // STEP 2: Request Background Location (Only if Foreground is granted first)
@@ -82,17 +82,17 @@ export default function NetworkTab() {
                     const bgGranted = await PermissionsAndroid.request(
                       PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION
                     );
-                    
+
                     if (bgGranted !== PermissionsAndroid.RESULTS.GRANTED) {
-                        // If they didn't select 'Allow all the time', we prompt them to go to settings manually
-                        Alert.alert(
-                            "Action Required",
-                            "You selected 'Only while using'. To get full coverage info, please go to Permissions > Location and select 'Allow all the time'.",
-                            [
-                                { text: "Later", style: "cancel" },
-                                { text: "Go to Settings", onPress: () => Linking.openSettings() }
-                            ]
-                        );
+                      // If they didn't select 'Allow all the time', we prompt them to go to settings manually
+                      Alert.alert(
+                        "Action Required",
+                        "You selected 'Only while using'. To get full coverage info, please go to Permissions > Location and select 'Allow all the time'.",
+                        [
+                          { text: "Later", style: "cancel" },
+                          { text: "Go to Settings", onPress: () => Linking.openSettings() }
+                        ]
+                      );
                     }
                   }
                 }
@@ -116,7 +116,12 @@ export default function NetworkTab() {
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={theme.colors.primary} /></View>;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 15 }}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <Text style={styles.title}>Network Monitor</Text>
+      <Text style={styles.subtitle}>
+        Real-time network signal and cell identity metrics.
+      </Text>
+
       <Text style={styles.updateText}>Last Refresh: {data?._ts}</Text>
 
       <Card title="DEVICE INFORMATION" accent={theme.colors.purple}>
@@ -160,23 +165,43 @@ export default function NetworkTab() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background.secondary },
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background.secondary,
+  },
+  contentContainer: {
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.xl + 20,
+    paddingBottom: theme.spacing.lg,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xs,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: theme.colors.text.secondary,
+    marginBottom: theme.spacing.lg,
+    lineHeight: 20,
+  },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   updateText: { fontSize: 11, color: theme.colors.text.light, marginBottom: 15 },
-  card: { 
-    backgroundColor: theme.colors.background.card, 
-    borderRadius: theme.borderRadius.lg, 
-    padding: theme.spacing.md - 1, 
-    marginBottom: theme.spacing.md - 1, 
-    borderTopWidth: 4, 
-    ...theme.shadows.md 
+  card: {
+    backgroundColor: theme.colors.background.card,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md - 1,
+    marginBottom: theme.spacing.md - 1,
+    borderTopWidth: 4,
+    ...theme.shadows.md
   },
-  cardTitle: { 
-    fontSize: 12, 
-    fontWeight: 'bold', 
-    letterSpacing: 1, 
-    marginBottom: theme.spacing.md - 1, 
-    textTransform: 'uppercase' 
+  cardTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    marginBottom: theme.spacing.md - 1,
+    textTransform: 'uppercase'
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   kpiContainer: { width: '50%', marginBottom: theme.spacing.sm },

@@ -8,35 +8,105 @@ import CallMetrics, {
   CallDisconnectModule,
 } from 'call-metrics';
 
+import { requireNativeModule } from 'expo-modules-core';
+
+// Try to get native diagnostic module
+let DeviceDiagnosticModule = null;
+try {
+  DeviceDiagnosticModule = requireNativeModule('DeviceDiagnosticModule');
+} catch (e) {
+  console.warn('[Voice] DeviceDiagnosticModule not available');
+}
+
+const DISCONNECT_CAUSES = {
+  1: "Unallocated (unassigned) number",
+  3: "No route to destination",
+  6: "Channel unacceptable",
+  16: "Normal call clearing",
+  17: "User busy",
+  18: "No user responding",
+  19: "User alerting, no answer",
+  21: "Call rejected",
+  22: "Number changed",
+  27: "Destination out of order",
+  28: "Invalid number format",
+  31: "Normal, unspecified",
+  34: "No circuit/channel available",
+  38: "Network out of order",
+  41: "Temporary failure",
+  42: "Switching equipment congestion",
+  44: "Requested circuit/channel not available",
+  47: "Resource unavailable, unspecified",
+  50: "Requested facility not subscribed",
+  57: "Bearer capability not authorized",
+  58: "Bearer capability not presently available",
+  63: "Service or option not available, unspecified",
+  65: "Bearer capability not implemented",
+  69: "Requested facility not implemented",
+  88: "Incompatible destination",
+  111: "Protocol error, unspecified",
+  127: "Interworking, unspecified",
+};
+
+const getDisconnectReason = (code, label) => {
+  if (code !== undefined && code !== null && DISCONNECT_CAUSES[code]) {
+    return `${DISCONNECT_CAUSES[code]} (${code})`;
+  }
+  return label ? `${label} (${code || '?'})` : `Unknown (${code || '?'})`;
+};
+
 export default function VoiceScreen() {
   const { addVoiceSample, metrics, scores } = useQoE();
   const [lastEvent, setLastEvent] = useState(null);
   const [lastReason, setLastReason] = useState(null);
   const [isListening, setIsListening] = useState(false);
+  const [signalMos, setSignalMos] = useState(0);
   const callStartTimeRef = useRef(null);
   const callSetupStartTimeRef = useRef(null);
+  const mosIntervalRef = useRef(null);
 
-  // Debug logging for metrics
-  useEffect(() => {
-    console.log('[Voice] Metrics updated:', {
-      attempts: metrics.voice.attempts,
-      setupOk: metrics.voice.setupOk,
-      completed: metrics.voice.completed,
-      dropped: metrics.voice.dropped,
-      setupTimes: metrics.voice.setupTimes,
-      mosSamples: metrics.voice.mosSamples,
-    });
-  }, [metrics]);
+  // ... (debug logging effects)
 
-  // Debug logging for scores
-  useEffect(() => {
-    console.log('[Voice] Scores calculated:', {
-      cssr: scores.voice.cssr,
-      cdr: scores.voice.cdr,
-      cstAvg: scores.voice.cstAvg,
-      mosAvg: scores.voice.mosAvg,
-    });
-  }, [scores]);
+  const stopMosPolling = () => {
+    if (mosIntervalRef.current) {
+      clearInterval(mosIntervalRef.current);
+      mosIntervalRef.current = null;
+    }
+  };
+
+  const startMosPolling = () => {
+    stopMosPolling();
+    if (!DeviceDiagnosticModule) return;
+
+    // Poll signal strength every 2 seconds
+    mosIntervalRef.current = setInterval(async () => {
+      try {
+        const diagnostics = await DeviceDiagnosticModule.getFullDiagnostics();
+        if (diagnostics && diagnostics.rsrp) {
+          const rsrp = parseInt(diagnostics.rsrp, 10);
+          if (!isNaN(rsrp)) {
+            // Calculate MOS based on RSRP (Approximation)
+            // RSRP >= -80: Excellent (4.4)
+            // RSRP >= -90: Good (4.0)
+            // RSRP >= -100: Fair (3.5)
+            // RSRP >= -110: Poor (3.0)
+            // RSRP < -110: Bad (2.0)
+            let estimatedMos = 2.0;
+            if (rsrp >= -80) estimatedMos = 4.4;
+            else if (rsrp >= -90) estimatedMos = 4.0;
+            else if (rsrp >= -100) estimatedMos = 3.5;
+            else if (rsrp >= -110) estimatedMos = 3.0;
+
+            console.log(`[Voice] RSRP: ${rsrp} dBm -> Est. MOS: ${estimatedMos}`);
+            setSignalMos(estimatedMos);
+            addVoiceSample({ mos: estimatedMos });
+          }
+        }
+      } catch (e) {
+        console.warn('[Voice] Failed to poll signal for MOS:', e);
+      }
+    }, 2000);
+  };
 
   const formatPercent = (value) => {
     if (value === null || value === undefined) return '--';
@@ -54,6 +124,7 @@ export default function VoiceScreen() {
     return value.toFixed(2);
   };
 
+  // Call Metrics listener
   useEffect(() => {
     const subscription = CallMetrics.addListener(
       'callMetrics:update',
@@ -64,63 +135,38 @@ export default function VoiceScreen() {
         console.log('[Voice] Call state changed:', payload.state, payload);
 
         if (payload.state === 'ringing') {
-          // Call is ringing - start tracking setup time
-          console.log('[Voice] Call ringing - starting setup timer');
+          // ...
           callSetupStartTimeRef.current = now;
-          addVoiceSample({
-            attempt: true,
-          });
+          addVoiceSample({ attempt: true });
         } else if (payload.state === 'offhook') {
-          // Call answered - calculate setup time
+          // ...
+          // Start MOS polling on active call
+          startMosPolling();
+
           if (callSetupStartTimeRef.current !== null) {
+            // ... (setup time logic)
             const setupTime = now - callSetupStartTimeRef.current;
-            console.log('[Voice] Call answered - setup time:', setupTime, 'ms');
-            addVoiceSample({
-              setupSuccessful: true,
-              setupTimeMs: setupTime,
-            });
+            addVoiceSample({ setupSuccessful: true, setupTimeMs: setupTime });
             callSetupStartTimeRef.current = null;
           } else {
-            // If we missed ringing state, use a default setup time or estimate
-            // For outgoing calls, setup is usually very fast (< 1 second)
-            console.log('[Voice] Call answered (missed ringing state) - using estimated setup time');
-            // Estimate setup time as 500ms for outgoing calls
-            addVoiceSample({
-              attempt: true,
-              setupSuccessful: true,
-              setupTimeMs: 500, // Estimated setup time for outgoing calls
-            });
+            // ...
+            addVoiceSample({ attempt: true, setupSuccessful: true, setupTimeMs: 500 });
           }
           callStartTimeRef.current = now;
         } else if (payload.state === 'idle') {
-          // Call ended
+          // Stop MOS polling
+          stopMosPolling();
+          setSignalMos(0);
+
+          // ... (call ended logic)
           if (callStartTimeRef.current !== null) {
-            // Call was answered (offhook happened)
             const callDuration = now - callStartTimeRef.current;
-            // If call lasted less than 5 seconds, consider it dropped
             const wasDropped = callDuration < 5000;
-            console.log('[Voice] Call ended - duration:', callDuration, 'ms, dropped:', wasDropped);
-            
-            // Don't increment attempts here - attempt was already counted when call started
-            addVoiceSample({
-              attempt: false, // Explicitly set to false to prevent double-counting
-              callCompleted: !wasDropped,
-              dropped: wasDropped,
-            });
-            
+            addVoiceSample({ attempt: false, callCompleted: !wasDropped, dropped: wasDropped });
             callStartTimeRef.current = null;
           } else if (callSetupStartTimeRef.current !== null) {
-            // Call ended while ringing (missed call) - this is a failed setup attempt
-            console.log('[Voice] Call ended while ringing (missed call) - failed setup');
-            const setupTime = now - callSetupStartTimeRef.current;
+            // ...
             callSetupStartTimeRef.current = null;
-            // Attempt was already counted when ringing started
-            // This is a failed setup attempt (ringing but not answered)
-            // We don't need to add anything here since attempt was already counted
-            // and setupSuccessful defaults to false, so CSSR will be correct
-          } else {
-            // Call ended without any prior state - ignore this (initial state or app startup)
-            console.log('[Voice] Call ended without prior state - ignoring');
           }
         }
       }
@@ -128,6 +174,7 @@ export default function VoiceScreen() {
 
     return () => {
       subscription?.remove();
+      stopMosPolling();
     };
   }, [addVoiceSample]);
 
@@ -147,7 +194,7 @@ export default function VoiceScreen() {
           callCompleted: false,
           dropped: false,
           reasonCode: payload?.causeCode,
-          reasonLabel: payload?.causeLabel || payload?.state,
+          reasonLabel: payload?.causeLabel || 'Unknown',
           reasonSource: payload?.source || 'native',
         });
       }
@@ -164,18 +211,18 @@ export default function VoiceScreen() {
   const handleStart = async () => {
     try {
       let granted = CallMetrics.isPermissionGranted();
-      
+
       if (!granted && Platform.OS === 'android') {
         // Request permissions (READ_PHONE_STATE and READ_CALL_LOG)
         const permissions = [
           PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
           PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
         ];
-        
+
         const results = await PermissionsAndroid.requestMultiple(permissions);
         granted = results[PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE] === PermissionsAndroid.RESULTS.GRANTED;
         const callLogGranted = results[PermissionsAndroid.PERMISSIONS.READ_CALL_LOG] === PermissionsAndroid.RESULTS.GRANTED;
-        
+
         if (!granted) {
           // Permission denied - check if we should show rationale
           // If false, it means permanently denied (user selected "Don't ask again")
@@ -183,7 +230,7 @@ export default function VoiceScreen() {
           const shouldShowRationale = await PermissionsAndroid.shouldShowRequestPermissionRationale?.(
             PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE
           ) ?? false;
-          
+
           if (!shouldShowRationale) {
             // Permanently denied - open settings
             Alert.alert(
@@ -208,18 +255,18 @@ export default function VoiceScreen() {
           }
           return;
         }
-        
+
         if (!callLogGranted) {
           console.warn('[Voice] READ_CALL_LOG permission denied - disconnect causes from call logs will not be available');
         }
       }
-      
+
       // Re-check permission after request
       granted = CallMetrics.isPermissionGranted();
-      
+
       if (granted) {
         await CallMetrics.start();
-        
+
         // Also start the disconnect cause listener if available
         if (CallDisconnectModule?.startListening) {
           try {
@@ -232,7 +279,7 @@ export default function VoiceScreen() {
         } else {
           console.warn('[Voice] CallDisconnectModule not available');
         }
-        
+
         setIsListening(true);
         Alert.alert('Success', 'Call listener started. Make or receive a call to see events.');
       } else {
@@ -307,7 +354,7 @@ export default function VoiceScreen() {
 
       <View style={styles.metricsBox}>
         <Text style={styles.sectionTitle}>Voice Metrics</Text>
-        
+
         <View style={styles.metricRow}>
           <Text style={styles.metricLabel}>Call Setup Success Rate (CSSR)</Text>
           <Text style={styles.metricValue}>
@@ -335,16 +382,20 @@ export default function VoiceScreen() {
             {formatMOS(scores.voice.mosAvg)}
           </Text>
         </View>
-        {scores.voice.mosAvg === null && (
-          <Text style={styles.noteText}>
-            Note: MOS requires audio quality measurements (not yet implemented)
-          </Text>
+
+        {signalMos > 0 && (
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Current Signal MOS (Est.)</Text>
+            <Text style={styles.metricValue}>
+              {signalMos.toFixed(1)} 📶
+            </Text>
+          </View>
         )}
 
         <View style={styles.divider} />
 
         <Text style={styles.subsectionTitle}>Raw Statistics</Text>
-        
+
         <View style={styles.metricRow}>
           <Text style={styles.metricLabel}>Total Attempts</Text>
           <Text style={styles.metricValue}>{metrics.voice.attempts}</Text>
@@ -381,8 +432,8 @@ export default function VoiceScreen() {
         <Text style={styles.lastEventText}>
           {lastEvent
             ? `${lastEvent.state} @ ${new Date(
-                lastEvent.timestamp
-              ).toLocaleTimeString()}`
+              lastEvent.timestamp
+            ).toLocaleTimeString()}`
             : 'No events yet'}
         </Text>
         {lastEvent && (
@@ -396,7 +447,7 @@ export default function VoiceScreen() {
         <Text style={styles.lastEventTitle}>Last disconnect reason (native)</Text>
         <Text style={styles.lastEventText}>
           {lastReason
-            ? `${lastReason.causeLabel || 'Unknown'} (${lastReason.causeCode ?? 'n/a'})`
+            ? getDisconnectReason(lastReason.causeCode, lastReason.causeLabel)
             : 'No disconnect causes yet'}
         </Text>
         {lastReason?.timestamp && (

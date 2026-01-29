@@ -125,7 +125,7 @@ export default function DataScreen() {
       const sizeBytes = blob.size;
       const effectiveTime = Math.max(downloadTime, duration, 1);
       const throughputKbps = sizeBytes > 0 && effectiveTime > 0
-        ? (sizeBytes * 8 * 1000) / effectiveTime
+        ? (sizeBytes * 8) / effectiveTime
         : 0;
 
       if (response.ok) {
@@ -390,7 +390,7 @@ export default function DataScreen() {
       // For very fast downloads, use total time as fallback
       const effectiveTime = Math.max(streamTime, totalTime, 1);
       const throughputKbps = totalBytes > 0 && effectiveTime > 0
-        ? (totalBytes * 8 * 1000) / effectiveTime // Convert bytes to bits, then ms to seconds, then to Kbps
+        ? (totalBytes * 8) / effectiveTime // Convert to Kbps
         : 0;
 
       console.log('[Data] Streaming throughput calc:', {
@@ -728,7 +728,7 @@ export default function DataScreen() {
         ? responseData.length
         : JSON.stringify(responseData).length;
       const throughputKbps = requestTime > 0
-        ? (responseSize * 8 * 1000) / requestTime // Convert bytes to bits, then ms to seconds, then to Kbps
+        ? (responseSize * 8) / requestTime // Convert to Kbps
         : 0;
 
       addSocialSample({

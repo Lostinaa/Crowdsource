@@ -1,11 +1,43 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import * as Updates from 'expo-updates';
 import { QoEProvider } from '../src/context/QoEContext';
 import { DrawerProvider } from '../src/context/DrawerContext';
 import Drawer from '../src/components/Drawer';
+import { pushNotificationService } from '../src/services/notificationService';
+
+const PUSH_ENABLED_KEY = '@push_notifications_enabled';
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Initialize push notifications
+    async function initNotifications() {
+      try {
+        const enabled = await AsyncStorage.getItem(PUSH_ENABLED_KEY);
+        // Default to true if not set
+        if (enabled === 'false') {
+          console.log('[App] Push notifications disabled by user');
+          return;
+        }
+
+        const token = await pushNotificationService.initialize();
+        if (token) {
+          console.log('[App] Push notifications initialized');
+        }
+      } catch (error) {
+        console.error('[App] Failed to initialize push notifications:', error);
+      }
+    }
+
+    initNotifications();
+
+    // Cleanup on unmount
+    return () => {
+      pushNotificationService.cleanup();
+    };
+  }, []);
+
   useEffect(() => {
     async function onFetchUpdateAsync() {
       try {
@@ -27,7 +59,7 @@ export default function RootLayout() {
 
         console.log('[Updates] Checking for updates...');
         const update = await Updates.checkForUpdateAsync();
-        
+
         console.log('[Updates] Check result:', {
           isAvailable: update.isAvailable,
           manifest: update.manifest ? 'present' : 'missing',
@@ -40,7 +72,7 @@ export default function RootLayout() {
             isNew: fetchResult.isNew,
             manifest: fetchResult.manifest ? 'present' : 'missing',
           });
-          
+
           if (fetchResult.isNew) {
             console.log('[Updates] Update downloaded, reloading app...');
             await Updates.reloadAsync();
@@ -78,5 +110,3 @@ export default function RootLayout() {
     </QoEProvider>
   );
 }
-
-

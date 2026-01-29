@@ -31,7 +31,15 @@
       ]
     },
     "plugins": [
-      "@maplibre/maplibre-react-native"
+      "@maplibre/maplibre-react-native",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#8ec63f",
+          "sounds": []
+        }
+      ]
     ],
     "web": {
       "favicon": "./assets/favicon.png"

@@ -10,40 +10,46 @@ import { backendApi } from '../../src/services/backendApi';
 import { theme } from '../../src/constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requireNativeModule } from 'expo-modules-core';
+import { pushNotificationService } from '../../src/services/notificationService';
+
 const BACKEND_URL_KEY = '@backend_url';
 const BACKEND_API_KEY = '@backend_api_key';
 const AUTO_SYNC_KEY = '@auto_sync_enabled';
+const PUSH_ENABLED_KEY = '@push_notifications_enabled';
 const DeviceDiagnosticModule = requireNativeModule('DeviceDiagnosticModule');
+
 export default function SettingsScreen() {
   const { metrics, scores, history, resetMetrics, clearHistory } = useQoE();
   const [autoSave, setAutoSave] = useState(false);
   const [backendUrl, setBackendUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [autoSync, setAutoSync] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState('');
 
-  // Load backend settings
+  // Load settings
   useEffect(() => {
-    const loadBackendSettings = async () => {
+    const loadSettings = async () => {
       try {
-        const [url, key, sync] = await Promise.all([
-          AsyncStorage.getItem(BACKEND_URL_KEY),
+        const [key, sync, push] = await Promise.all([
           AsyncStorage.getItem(BACKEND_API_KEY),
           AsyncStorage.getItem(AUTO_SYNC_KEY),
+          AsyncStorage.getItem(PUSH_ENABLED_KEY),
         ]);
-        // Use saved URL or auto-detect based on device type
-        // For emulator: 10.0.2.2, for real device: actual IP
+
         const getDefaultUrl = () => {
+          if (process.env.EXPO_PUBLIC_BACKEND_URL) return process.env.EXPO_PUBLIC_BACKEND_URL;
           if (Platform.OS === 'android' && !Device.isDevice) {
-            return 'http://10.0.2.2:8000/api'; // Android emulator
+            return 'http://10.0.2.2:8000/api';
           }
-          return 'http://172.25.210.174:8000/api'; // Real device
+          // Default fallback
+          return 'http://172.25.210.174:8000/api';
         };
-        const backendUrlToUse = url || getDefaultUrl();
-        console.log('[Settings] Loading backend URL:', backendUrlToUse, url ? '(from storage)' : '(auto-detected)');
+        const backendUrlToUse = getDefaultUrl();
         setBackendUrl(backendUrlToUse);
         backendApi.setBackendUrl(backendUrlToUse);
+
         if (key) {
           setApiKey(key);
           backendApi.setApiKey(key);
@@ -51,12 +57,38 @@ export default function SettingsScreen() {
         if (sync === 'true') {
           setAutoSync(true);
         }
+        // Default to true if not set
+        setPushEnabled(push !== 'false');
       } catch (error) {
-        console.error('[Settings] Failed to load backend settings:', error);
+        console.error('[Settings] Failed to load settings:', error);
       }
     };
-    loadBackendSettings();
+    loadSettings();
   }, []);
+
+  const togglePushNotifications = async (value) => {
+    setPushEnabled(value);
+    try {
+      await AsyncStorage.setItem(PUSH_ENABLED_KEY, value.toString());
+      if (value) {
+        // Enable: Register token
+        const token = await pushNotificationService.initialize();
+        if (token) {
+          Alert.alert('Notifications Enabled', 'You will now receive QoE alerts.');
+        } else {
+          // If failed (e.g. permission denied) revert toggle
+          setPushEnabled(false);
+          await AsyncStorage.setItem(PUSH_ENABLED_KEY, 'false');
+          Alert.alert('Error', 'Failed to enable notifications. Please check app permissions.');
+        }
+      } else {
+        // Disable: Unregister token
+        await pushNotificationService.unregisterToken();
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to save push preference:', error);
+    }
+  };
 
   // Auto-sync when enabled
   useEffect(() => {
@@ -80,7 +112,7 @@ export default function SettingsScreen() {
 
       const fileName = `qoe-export-${Date.now()}.json`;
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-      
+
       await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(data, null, 2));
 
       if (await Sharing.isAvailableAsync()) {
@@ -101,7 +133,7 @@ export default function SettingsScreen() {
   const exportToCSV = async () => {
     try {
       let csv = 'Timestamp,Overall Score,Voice Score,Data Score,Voice Attempts,Voice Completed,Voice Dropped,Browsing Requests,Browsing Completed,Streaming Requests,Streaming Completed,HTTP DL Requests,HTTP DL Completed,HTTP UL Requests,HTTP UL Completed,Social Requests,Social Completed\n';
-      
+
       // Add current metrics
       const now = new Date().toISOString();
       csv += `${now},${scores.overall?.score || ''},${scores.voice?.score || ''},${scores.data?.score || ''},`;
@@ -126,7 +158,7 @@ export default function SettingsScreen() {
 
       const fileName = `qoe-export-${Date.now()}.csv`;
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-      
+
       await FileSystem.writeAsStringAsync(fileUri, csv);
 
       if (await Sharing.isAvailableAsync()) {
@@ -183,11 +215,10 @@ export default function SettingsScreen() {
   const saveBackendSettings = async () => {
     try {
       await Promise.all([
-        AsyncStorage.setItem(BACKEND_URL_KEY, backendUrl),
         AsyncStorage.setItem(BACKEND_API_KEY, apiKey),
         AsyncStorage.setItem(AUTO_SYNC_KEY, autoSync.toString()),
       ]);
-      backendApi.setBackendUrl(backendUrl);
+      // backendApi.setBackendUrl(backendUrl); // Set on load based on ENV
       backendApi.setApiKey(apiKey);
       Alert.alert('Success', 'Backend settings saved!');
     } catch (error) {
@@ -215,10 +246,10 @@ export default function SettingsScreen() {
 
   // const syncToBackend = async () => {
   //   if (isSyncing) return;
-    
+
   //   setIsSyncing(true);
   //   setSyncStatus('Syncing...');
-    
+
   //   try {
   //     // Get device info
   //     const deviceInfo = {
@@ -248,7 +279,7 @@ export default function SettingsScreen() {
   //     }
 
   //     const result = await backendApi.sendMetrics(metrics, scores, deviceInfo, location);
-      
+
   //     if (result.success) {
   //       setSyncStatus('Sync successful');
   //       Alert.alert('Success', 'Data synced to backend successfully!');
@@ -263,91 +294,91 @@ export default function SettingsScreen() {
   //     setIsSyncing(false);
   //   }
   // };
-const syncToBackend = async () => {
-  if (isSyncing) return;
-  setIsSyncing(true);
-  setSyncStatus('Syncing...');
+  const syncToBackend = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    setSyncStatus('Syncing...');
 
-  try {
-    // 1. Fetch diagnostics from Native Module safely
-    let diagnostics = null;
-    if (DeviceDiagnosticModule) {
-      try {
-        diagnostics = await DeviceDiagnosticModule.getFullDiagnostics();
-      } catch (e) {
-        console.warn('[Settings] Native diagnostics failed', e);
-      }
-    }
-
-    // 2. Assemble ONE FLAT Object
-    // We remove "signalQuality", "cellIdentity", etc. 
-    // This allows the backend to see "rsrp", "cellId", etc. as individual fields.
-    const deviceInfo = {
-      // Device Details
-      platform: Platform.OS,
-      model: Device.modelName || 'unknown',
-      osVersion: Platform.Version.toString(),
-      appVersion: '1.0.0',
-      brand: diagnostics?.brand || Device.brand || 'N/A',
-      Android_version: diagnostics?.Version || Platform.Version.toString(),
-      operator: diagnostics?.operator || 'N/A',
-      
-      // Signal KPIs (Now at root level)
-      rsrp: diagnostics?.rsrp ?? 'N/A',
-      rsrq: diagnostics?.rsrq ?? 'N/A',
-      rssnr: diagnostics?.rssnr ?? 'N/A',
-      cqi: diagnostics?.cqi ?? 'N/A',
-      netType: diagnostics?.netType ?? 'N/A',
-      
-      // Cell Identity KPIs (Now at root level)
-      enb: diagnostics?.enb ?? 'N/A',
-      cellId: diagnostics?.cellId ?? 'N/A',
-      pci: diagnostics?.pci ?? 'N/A',
-      tac: diagnostics?.tac ?? 'N/A',
-      eci: diagnostics?.eci ?? 'N/A',
-      
-      // Network State KPIs (Now at root level)
-      dataState: diagnostics?.dataState ?? 'N/A',
-      dataActivity: diagnostics?.dataActivity ?? 'N/A',
-      callState: diagnostics?.callState ?? 'N/A',
-      simState: diagnostics?.simState ?? 'N/A',
-      isRoaming: diagnostics?.isRoaming ?? 'N/A',
-    };
-
-    // 3. Get Location
-    let location = null;
     try {
-      const { status } = await Location.getForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        location = {
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-          accuracy: loc.coords.accuracy,
-          timestamp: loc.timestamp,
-        };
+      // 1. Fetch diagnostics from Native Module safely
+      let diagnostics = null;
+      if (DeviceDiagnosticModule) {
+        try {
+          diagnostics = await DeviceDiagnosticModule.getFullDiagnostics();
+        } catch (e) {
+          console.warn('[Settings] Native diagnostics failed', e);
+        }
       }
-    } catch (locError) {
-      console.warn('[Settings] Location error', locError);
-    }
 
-    // 4. Send the flattened data to the backend
-    const result = await backendApi.sendMetrics(metrics, scores, deviceInfo, location);
+      // 2. Assemble ONE FLAT Object
+      // We remove "signalQuality", "cellIdentity", etc. 
+      // This allows the backend to see "rsrp", "cellId", etc. as individual fields.
+      const deviceInfo = {
+        // Device Details
+        platform: Platform.OS,
+        model: Device.modelName || 'unknown',
+        osVersion: Platform.Version.toString(),
+        appVersion: '1.0.0',
+        brand: diagnostics?.brand || Device.brand || 'N/A',
+        Android_version: diagnostics?.Version || Platform.Version.toString(),
+        operator: diagnostics?.operator || 'N/A',
 
-    if (result.success) {
-      setSyncStatus('Sync successful');
-      Alert.alert('Success', 'Data synced successfully!');
-    } else {
-      setSyncStatus('Sync failed: ' + result.error);
-      Alert.alert('Warning', 'Sync failed: ' + result.error);
+        // Signal KPIs (Now at root level)
+        rsrp: diagnostics?.rsrp ?? 'N/A',
+        rsrq: diagnostics?.rsrq ?? 'N/A',
+        rssnr: diagnostics?.rssnr ?? 'N/A',
+        cqi: diagnostics?.cqi ?? 'N/A',
+        netType: diagnostics?.netType ?? 'N/A',
+
+        // Cell Identity KPIs (Now at root level)
+        enb: diagnostics?.enb ?? 'N/A',
+        cellId: diagnostics?.cellId ?? 'N/A',
+        pci: diagnostics?.pci ?? 'N/A',
+        tac: diagnostics?.tac ?? 'N/A',
+        eci: diagnostics?.eci ?? 'N/A',
+
+        // Network State KPIs (Now at root level)
+        dataState: diagnostics?.dataState ?? 'N/A',
+        dataActivity: diagnostics?.dataActivity ?? 'N/A',
+        callState: diagnostics?.callState ?? 'N/A',
+        simState: diagnostics?.simState ?? 'N/A',
+        isRoaming: diagnostics?.isRoaming ?? 'N/A',
+      };
+
+      // 3. Get Location
+      let location = null;
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          location = {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            accuracy: loc.coords.accuracy,
+            timestamp: loc.timestamp,
+          };
+        }
+      } catch (locError) {
+        console.warn('[Settings] Location error', locError);
+      }
+
+      // 4. Send the flattened data to the backend
+      const result = await backendApi.sendMetrics(metrics, scores, deviceInfo, location);
+
+      if (result.success) {
+        setSyncStatus('Sync successful');
+        Alert.alert('Success', 'Data synced successfully!');
+      } else {
+        setSyncStatus('Sync failed: ' + result.error);
+        Alert.alert('Warning', 'Sync failed: ' + result.error);
+      }
+    } catch (error) {
+      setSyncStatus('Error: ' + error.message);
+      Alert.alert('Sync Error', error.message);
+    } finally {
+      setIsSyncing(false);
     }
-  } catch (error) {
-    setSyncStatus('Error: ' + error.message);
-    Alert.alert('Sync Error', error.message);
-  } finally {
-    setIsSyncing(false);
-  }
-};
+  };
   const SettingItem = ({ title, description, onPress, rightComponent, danger = false }) => (
     <TouchableOpacity
       style={styles.settingItem}
@@ -430,40 +461,30 @@ const syncToBackend = async () => {
         </View>
       </View>
 
+      {/* Notifications Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Notifications</Text>
+        <View style={styles.settingItem}>
+          <View style={styles.settingItemContent}>
+            <Text style={styles.settingItemTitle}>Push Notifications</Text>
+            <Text style={styles.settingItemDescription}>Receive alerts when QoE scores are poor</Text>
+          </View>
+          <Switch
+            value={pushEnabled}
+            onValueChange={togglePushNotifications}
+            trackColor={{ false: theme.colors.border.medium, true: theme.colors.primary }}
+            thumbColor={theme.colors.white}
+          />
+        </View>
+      </View>
+
       {/* Backend Sync Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Backend Sync</Text>
         <View style={styles.backendConfig}>
           <Text style={styles.inputLabel}>Backend URL</Text>
-          <TextInput
-            style={styles.input}
-            value={backendUrl}
-            onChangeText={setBackendUrl}
-            placeholder="https://api.example.com/qoe"
-            placeholderTextColor="#6b7280"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <TouchableOpacity
-            style={[styles.button, styles.buttonSecondary, { marginTop: 8, marginBottom: 8, padding: 8 }]}
-            onPress={async () => {
-              const getDefaultUrl = () => {
-                if (Platform.OS === 'android' && !Device.isDevice) {
-                  return 'http://10.0.2.2:8000/api'; // Android emulator
-                }
-                return 'http://172.25.210.174:8000/api'; // Real device
-              };
-              const defaultUrl = getDefaultUrl();
-              setBackendUrl(defaultUrl);
-              backendApi.setBackendUrl(defaultUrl);
-              await AsyncStorage.removeItem(BACKEND_URL_KEY);
-              Alert.alert('Reset', `Backend URL reset to auto-detected: ${defaultUrl}`);
-            }}
-          >
-            <Text style={[styles.buttonText, { fontSize: 12 }]}>Reset to Auto-Detect</Text>
-          </TouchableOpacity>
-          <Text style={[styles.inputLabel, { fontSize: 12, fontWeight: '400', marginTop: 4, marginBottom: 8 }]}>
-            Current: {Platform.OS === 'android' && !Device.isDevice ? 'Emulator (10.0.2.2)' : 'Real Device (172.25.210.174)'}
+          <Text style={[styles.inputLabel, { fontSize: 13, fontWeight: '400', marginBottom: 15, color: theme.colors.text.secondary }]}>
+            {process.env.EXPO_PUBLIC_BACKEND_URL || 'Using default configuration'}
           </Text>
           <Text style={styles.inputLabel}>API Key (Optional)</Text>
           <TextInput
@@ -532,7 +553,7 @@ const syncToBackend = async () => {
           description="Crowdsourcing QoE Measurement App"
           onPress={null}
         />
-    </View>
+      </View>
     </ScrollView>
   );
 }
