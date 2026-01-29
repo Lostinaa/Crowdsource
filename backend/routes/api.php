@@ -10,7 +10,7 @@ use App\Http\Controllers\CoverageSampleController;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes
+| API Routes 
 |--------------------------------------------------------------------------
 */
 
@@ -26,6 +26,7 @@ Route::post('/metrics', [MetricsController::class, 'store']);
 Route::get('/metrics', [MetricsController::class, 'index']);
 Route::get('/metrics/{id}', [MetricsController::class, 'show']);
 Route::post('/coverage-samples', [CoverageSampleController::class, 'store']);
+
 Route::get('/coverage-samples', [CoverageSampleController::class, 'index']);
 Route::get('/coverage-samples/statistics', [CoverageSampleController::class, 'statistics']);
 
@@ -34,6 +35,7 @@ Route::get('/analytics/overview', [AnalyticsController::class, 'overview']);
 Route::get('/analytics/voice', [AnalyticsController::class, 'voice']);
 Route::get('/analytics/data', [AnalyticsController::class, 'data']);
 Route::get('/analytics/trends', [AnalyticsController::class, 'trends']);
+
 
 // Protected routes (require authentication)
 Route::middleware('auth:sanctum')->group(function () {
