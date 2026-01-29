@@ -37,7 +37,7 @@ export default function SpeedTestWebView({
         let source = null;
         switch (testType) {
           case 'browsing':
-            source = { uri: 'https://example.com' };
+            source = { uri: 'https://www.wikipedia.org' };
             break;
           case 'video': {
             const videoHtml = `
@@ -64,7 +64,7 @@ export default function SpeedTestWebView({
             source = { uri: 'https://www.wikipedia.org' };
             break;
           default:
-            source = { uri: 'https://example.com' };
+            source = { uri: 'https://www.wikipedia.org' };
         }
         console.log('[SpeedTestWebView] Setting webSource now:', source?.uri || 'HTML');
         setWebSource(source);
