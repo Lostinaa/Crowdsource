@@ -293,6 +293,7 @@ export default function VoiceScreen() {
           onPress={handleStart}
           disabled={isListening}
           style={{ flex: 1 }}
+          textStyle={{}}
         />
         <BrandedButton
           title="Stop listener"
@@ -300,6 +301,7 @@ export default function VoiceScreen() {
           disabled={!isListening}
           variant="outline"
           style={{ flex: 1 }}
+          textStyle={{}}
         />
       </View>
 

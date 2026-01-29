@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@expo/vector-icons": "latest",
-    "@kingfang007/react-native-ftp-client": "^1.1.7",
+    "react-native-ftp-client": "github:navico-mobile/react-native-ftp-client#master",
     "@maplibre/maplibre-react-native": "^10.4.2",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/netinfo": "^11.4.1",

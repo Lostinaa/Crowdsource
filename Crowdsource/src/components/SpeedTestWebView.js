@@ -7,11 +7,11 @@ import { theme } from '../constants/theme';
  * WebView-based speed test component (nPerf-style)
  * Shows a modal with WebView that loads test content and measures performance
  */
-export default function SpeedTestWebView({ 
-  visible, 
-  onClose, 
+export default function SpeedTestWebView({
+  visible,
+  onClose,
   testType, // 'browsing', 'video', 'latency'
-  onTestComplete 
+  onTestComplete
 }) {
   const [loading, setLoading] = useState(true);
   const [startTime, setStartTime] = useState(null);
@@ -80,7 +80,7 @@ export default function SpeedTestWebView({
     const endTime = Date.now();
     const totalTime = endTime - (startTime || endTime);
     const dnsTime = dnsStartRef.current ? (endTime - dnsStartRef.current) : null;
-    
+
     console.log('[SpeedTestWebView] Load time:', totalTime, 'ms, DNS time:', dnsTime, 'ms');
     setLoadTime(totalTime);
     setDnsTime(dnsTime);
@@ -155,7 +155,7 @@ export default function SpeedTestWebView({
     const { nativeEvent } = syntheticEvent;
     console.error('[SpeedTestWebView] WebView error:', nativeEvent);
     setLoading(false);
-    
+
     if (onTestComplete) {
       onTestComplete({
         duration: Date.now() - (startTime || Date.now()),
@@ -198,37 +198,37 @@ export default function SpeedTestWebView({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <View style={styles.modalCard}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>{getTestTitle()}</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Test Info */}
-          <View style={styles.infoBar}>
-            {loading && (
-              <View style={styles.infoRow}>
-                <ActivityIndicator size="small" color={theme.colors.primary} />
-                <Text style={styles.infoText}>Loading test page...</Text>
+              {/* Header */}
+              <View style={styles.header}>
+                <Text style={styles.title}>{getTestTitle()}</Text>
+                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
               </View>
-            )}
-            {loadTime !== null && (
-              <View style={styles.metricsContainer}>
-                <View style={styles.metricItem}>
-                  <Text style={styles.metricLabel}>Load Time:</Text>
-                  <Text style={styles.metricValue}>{(loadTime / 1000).toFixed(2)}s</Text>
-                </View>
-                {dnsTime !== null && (
-                  <View style={styles.metricItem}>
-                    <Text style={styles.metricLabel}>DNS Time:</Text>
-                    <Text style={styles.metricValue}>{(dnsTime / 1000).toFixed(2)}s</Text>
+
+              {/* Test Info */}
+              <View style={styles.infoBar}>
+                {loading && (
+                  <View style={styles.infoRow}>
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                    <Text style={styles.infoText}>Loading test page...</Text>
+                  </View>
+                )}
+                {loadTime !== null && (
+                  <View style={styles.metricsContainer}>
+                    <View style={styles.metricItem}>
+                      <Text style={styles.metricLabel}>Load Time:</Text>
+                      <Text style={styles.metricValue}>{(loadTime / 1000).toFixed(2)}s</Text>
+                    </View>
+                    {dnsTime !== null && (
+                      <View style={styles.metricItem}>
+                        <Text style={styles.metricLabel}>DNS Time:</Text>
+                        <Text style={styles.metricValue}>{(dnsTime / 1000).toFixed(2)}s</Text>
+                      </View>
+                    )}
                   </View>
                 )}
               </View>
-            )}
-          </View>
 
               {/* WebView */}
               {webSource ? (
@@ -247,6 +247,7 @@ export default function SpeedTestWebView({
                   mediaPlaybackRequiresUserAction={false}
                   allowsInlineMediaPlayback={true}
                   mixedContentMode="always"
+                  androidLayerType="software"
                 />
               ) : (
                 <View style={[styles.webview, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -265,7 +266,7 @@ export default function SpeedTestWebView({
                   {testType === 'latency' && 'Testing connection latency...'}
                 </Text>
                 {loadTime !== null && (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.doneButton}
                     onPress={onClose}
                   >

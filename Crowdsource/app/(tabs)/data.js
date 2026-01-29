@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Button, ScrollView, Alert, TouchableOpacity, InteractionManager } from 'react-native';
+import { View, Text, StyleSheet, Button, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import * as FileSystem from 'expo-file-system';
@@ -14,7 +14,7 @@ const getFTPClient = () => {
   if (FTPClient) return FTPClient;
   try {
     // eslint-disable-next-line global-require, import/no-extraneous-dependencies
-    const mod = require('@kingfang007/react-native-ftp-client');
+    const mod = require('react-native-ftp-client');
     FTPClient = mod.default || mod;
   } catch (e) {
     console.warn('[Data] FTP client native module not available:', e?.message || e);
@@ -163,7 +163,7 @@ export default function DataScreen() {
           durationMs: result.duration,
           dnsResolutionTimeMs: result.dnsTime,
         });
-        InteractionManager.runAfterInteractions(() => {
+        setImmediate(() => {
           Alert.alert(
             'Browsing Test',
             result.success
@@ -192,7 +192,7 @@ export default function DataScreen() {
           completed: result.success,
           score: Math.round(latencyScore),
         });
-        InteractionManager.runAfterInteractions(() => {
+        setImmediate(() => {
           Alert.alert(
             'Latency Test',
             result.success
@@ -392,21 +392,21 @@ export default function DataScreen() {
 
       // Estimate MOS based on throughput (simplified model)
       // Higher throughput = better quality
-      const mos = throughputKbps > 5000 ? 4.5 : 
-                   throughputKbps > 2000 ? 4.0 :
-                   throughputKbps > 1000 ? 3.5 :
-                   throughputKbps > 500 ? 3.0 : 2.5;
+      const mos = throughputKbps > 5000 ? 4.5 :
+        throughputKbps > 2000 ? 4.0 :
+          throughputKbps > 1000 ? 3.5 :
+            throughputKbps > 500 ? 3.0 : 2.5;
 
       // Estimate resolution based on throughput
       const resolution = throughputKbps > 5000 ? 'HD' :
-                         throughputKbps > 2000 ? 'SD' :
-                         throughputKbps > 1000 ? '360p' : '240p';
+        throughputKbps > 2000 ? 'SD' :
+          throughputKbps > 1000 ? '360p' : '240p';
 
       // Simulate buffering count (in real app, this would come from video player events)
       // Higher throughput = fewer buffering events
       const bufferingCount = throughputKbps > 5000 ? 0 :
-                            throughputKbps > 2000 ? 1 :
-                            throughputKbps > 1000 ? 2 : 3;
+        throughputKbps > 2000 ? 1 :
+          throughputKbps > 1000 ? 2 : 3;
 
       // Mark as completed (don't count as new request)
       addStreamingSample({
@@ -789,13 +789,13 @@ export default function DataScreen() {
       const cleanLocalPath = localPath.replace('file://', '');
 
       const startTime = Date.now();
-      
+
       // Add timeout wrapper for FTP download
       const downloadPromise = FTP.downloadFile(cleanLocalPath, FTP_CONFIG.downloadPath);
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('FTP download timeout after 30 seconds')), 30000)
       );
-      
+
       await Promise.race([downloadPromise, timeoutPromise]);
       const totalTime = Date.now() - startTime || 1;
 
@@ -894,13 +894,13 @@ export default function DataScreen() {
       const cleanLocalPath = localPath.replace('file://', '');
 
       const startTime = Date.now();
-      
+
       // Add timeout wrapper for FTP upload
       const uploadPromise = FTP.uploadFile(cleanLocalPath, FTP_CONFIG.uploadPath);
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('FTP upload timeout after 30 seconds')), 30000)
       );
-      
+
       await Promise.race([uploadPromise, timeoutPromise]);
       const uploadTime = Date.now() - startTime || 1;
 
@@ -1149,13 +1149,13 @@ export default function DataScreen() {
           <View style={styles.buttonRow}>
             <BrandedButton
               title="Test Download"
-              onPress={testHttpDownload}
+              onPress={() => testHttpDownload()}
               disabled={isTesting}
               style={{ flex: 1 }}
             />
             <BrandedButton
               title="Test Upload"
-              onPress={testHttpUpload}
+              onPress={() => testHttpUpload()}
               disabled={isTesting}
               style={{ flex: 1 }}
             />
@@ -1202,7 +1202,7 @@ export default function DataScreen() {
           <Text style={styles.sectionTitle}>Social Media</Text>
           <BrandedButton
             title="Test Social Media"
-            onPress={testSocialMedia}
+            onPress={() => testSocialMedia()}
             disabled={isTesting}
           />
           <View style={styles.metricsBox}>
@@ -1235,13 +1235,13 @@ export default function DataScreen() {
           <View style={styles.buttonRow}>
             <BrandedButton
               title="Test FTP Download"
-              onPress={testFtpDownload}
+              onPress={() => testFtpDownload()}
               disabled={isTesting}
               style={{ flex: 1 }}
             />
             <BrandedButton
               title="Test FTP Upload"
-              onPress={testFtpUpload}
+              onPress={() => testFtpUpload()}
               disabled={isTesting}
               style={{ flex: 1 }}
             />

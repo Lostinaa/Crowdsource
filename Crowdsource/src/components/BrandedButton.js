@@ -6,6 +6,13 @@ import { theme } from '../constants/theme';
 /**
  * Branded Button Component - Matches company branding
  * Uses the company green gradient (#8ec63f → #6db02f)
+ * @param {string} title
+ * @param {() => void} onPress
+ * @param {boolean} [disabled]
+ * @param {boolean} [loading]
+ * @param {'primary'|'secondary'|'outline'} [variant]
+ * @param {import('react-native').ViewStyle} [style]
+ * @param {import('react-native').TextStyle} [textStyle] - Optional text style override
  */
 export default function BrandedButton({
   title,
