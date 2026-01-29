@@ -29,6 +29,7 @@ export default function DataScreen() {
   const [networkState, setNetworkState] = useState(null);
   const [webViewVisible, setWebViewVisible] = useState(false);
   const [webViewTestType, setWebViewTestType] = useState(null);
+  const webViewCompletedRef = useRef(false);
 
 
   // Reset completion ref when opening WebView so next test can complete once
