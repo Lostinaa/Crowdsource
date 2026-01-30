@@ -11,6 +11,8 @@ import { theme } from '../../src/constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requireNativeModule } from 'expo-modules-core';
 import { pushNotificationService } from '../../src/services/notificationService';
+import ScreenHeader from '../../src/components/ScreenHeader';
+import { BACKEND_CONFIG } from '../../src/constants/config';
 
 const BACKEND_URL_KEY = '@backend_url';
 const BACKEND_API_KEY = '@backend_api_key';
@@ -39,12 +41,7 @@ export default function SettingsScreen() {
         ]);
 
         const getDefaultUrl = () => {
-          if (process.env.EXPO_PUBLIC_BACKEND_URL) return process.env.EXPO_PUBLIC_BACKEND_URL;
-          if (Platform.OS === 'android' && !Device.isDevice) {
-            return 'http://10.0.2.2:8000/api';
-          }
-          // Default fallback
-          return 'http://172.25.210.174:8000/api';
+          return BACKEND_CONFIG.url;
         };
         const backendUrlToUse = getDefaultUrl();
         setBackendUrl(backendUrlToUse);
@@ -398,186 +395,189 @@ export default function SettingsScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.title}>Settings</Text>
-      <Text style={styles.subtitle}>
-        Configure app settings, export data, and manage your QoE measurements.
-      </Text>
-
-      {/* Data Export Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Data Export</Text>
-        <SettingItem
-          title="Export to JSON"
-          description="Export all QoE data including current metrics and history"
-          onPress={exportToJSON}
-        />
-        <SettingItem
-          title="Export to CSV"
-          description="Export QoE data in CSV format for spreadsheet analysis"
-          onPress={exportToCSV}
-        />
-      </View>
-
-      {/* Data Management Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Data Management</Text>
-        <SettingItem
-          title="Reset Current Metrics"
-          description="Clear all current QoE measurements (history will be preserved)"
-          onPress={handleResetMetrics}
-          danger={true}
-        />
-        <SettingItem
-          title="Clear History"
-          description={`Delete all ${history.length} saved history entries`}
-          onPress={handleClearHistory}
-          danger={true}
-        />
-      </View>
-
-      {/* Statistics Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Statistics</Text>
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>History Entries</Text>
-            <Text style={styles.statValue}>{history.length}</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Voice Attempts</Text>
-            <Text style={styles.statValue}>{metrics.voice.attempts}</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Data Tests</Text>
-            <Text style={styles.statValue}>
-              {metrics.data.browsing.requests +
-                metrics.data.streaming.requests +
-                metrics.data.http.dl.requests +
-                metrics.data.http.ul.requests +
-                metrics.data.social.requests}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Notifications Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notifications</Text>
-        <View style={styles.settingItem}>
-          <View style={styles.settingItemContent}>
-            <Text style={styles.settingItemTitle}>Push Notifications</Text>
-            <Text style={styles.settingItemDescription}>Receive alerts when QoE scores are poor</Text>
-          </View>
-          <Switch
-            value={pushEnabled}
-            onValueChange={togglePushNotifications}
-            trackColor={{ false: theme.colors.border.medium, true: theme.colors.primary }}
-            thumbColor={theme.colors.white}
-          />
-        </View>
-      </View>
-
-      {/* Backend Sync Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Backend Sync</Text>
-        <View style={styles.backendConfig}>
-          <Text style={styles.inputLabel}>Backend URL</Text>
-          <Text style={[styles.inputLabel, { fontSize: 13, fontWeight: '400', marginBottom: 15, color: theme.colors.text.secondary }]}>
-            {process.env.EXPO_PUBLIC_BACKEND_URL || 'Using default configuration'}
+    <View style={styles.mainContainer}>
+      <ScreenHeader title="Settings" />
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.headerTextSection}>
+          <Text style={styles.subtitle}>
+            Configure app settings, export data, and manage your QoE measurements.
           </Text>
-          <Text style={styles.inputLabel}>API Key (Optional)</Text>
-          <TextInput
-            style={styles.input}
-            value={apiKey}
-            onChangeText={setApiKey}
-            placeholder="Enter API key for authentication"
-            placeholderTextColor="#6b7280"
-            autoCapitalize="none"
-            autoCorrect={false}
-            secureTextEntry
+        </View>
+
+        {/* Data Export Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Data Export</Text>
+          <SettingItem
+            title="Export to JSON"
+            description="Export all QoE data including current metrics and history"
+            onPress={exportToJSON}
           />
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Auto Sync (every 5 min)</Text>
+          <SettingItem
+            title="Export to CSV"
+            description="Export QoE data in CSV format for spreadsheet analysis"
+            onPress={exportToCSV}
+          />
+        </View>
+
+        {/* Data Management Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Data Management</Text>
+          <SettingItem
+            title="Reset Current Metrics"
+            description="Clear all current QoE measurements (history will be preserved)"
+            onPress={handleResetMetrics}
+            danger={true}
+          />
+          <SettingItem
+            title="Clear History"
+            description={`Delete all ${history.length} saved history entries`}
+            onPress={handleClearHistory}
+            danger={true}
+          />
+        </View>
+
+        {/* Statistics Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Statistics</Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>History Entries</Text>
+              <Text style={styles.statValue}>{history.length}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Voice Attempts</Text>
+              <Text style={styles.statValue}>{metrics.voice.attempts}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Data Tests</Text>
+              <Text style={styles.statValue}>
+                {metrics.data.browsing.requests +
+                  metrics.data.streaming.requests +
+                  metrics.data.http.dl.requests +
+                  metrics.data.http.ul.requests +
+                  metrics.data.social.requests}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Notifications Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notifications</Text>
+          <View style={styles.settingItem}>
+            <View style={styles.settingItemContent}>
+              <Text style={styles.settingItemTitle}>Push Notifications</Text>
+              <Text style={styles.settingItemDescription}>Receive alerts when QoE scores are poor</Text>
+            </View>
             <Switch
-              value={autoSync}
-              onValueChange={setAutoSync}
+              value={pushEnabled}
+              onValueChange={togglePushNotifications}
               trackColor={{ false: theme.colors.border.medium, true: theme.colors.primary }}
               thumbColor={theme.colors.white}
             />
           </View>
-          <View style={styles.buttonRow}>
-            <BrandedButton
-              title="Save Settings"
-              onPress={saveBackendSettings}
-              variant="outline"
-              style={{ flex: 1 }}
-            />
-            <BrandedButton
-              title="Test Connection"
-              onPress={testBackendConnection}
-              disabled={isSyncing}
-              loading={isSyncing}
-              variant="outline"
-              style={{ flex: 1 }}
-            />
-          </View>
-          <BrandedButton
-            title={isSyncing ? 'Syncing...' : 'Sync Now'}
-            onPress={syncToBackend}
-            disabled={isSyncing || !backendUrl}
-            loading={isSyncing}
-            style={{ marginTop: theme.spacing.sm }}
-          />
-          {syncStatus ? (
-            <Text style={styles.syncStatus}>{syncStatus}</Text>
-          ) : null}
         </View>
-      </View>
 
-      {/* App Information Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>App Information</Text>
-        <SettingItem
-          title="Version"
-          description="1.0.0"
-          onPress={null}
-        />
-        <SettingItem
-          title="Scoring Standard"
-          description="ETSI TR 103 559"
-          onPress={null}
-        />
-        <SettingItem
-          title="About"
-          description="Crowdsourcing QoE Measurement App"
-          onPress={null}
-        />
-      </View>
-    </ScrollView>
+        {/* Backend Sync Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Backend Sync</Text>
+          <View style={styles.backendConfig}>
+            <Text style={styles.inputLabel}>Backend URL</Text>
+            <Text style={[styles.inputLabel, { fontSize: 13, fontWeight: '400', marginBottom: 15, color: theme.colors.text.secondary }]}>
+              {process.env.EXPO_PUBLIC_BACKEND_URL || 'Using default configuration'}
+            </Text>
+            <Text style={styles.inputLabel}>API Key (Optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={apiKey}
+              onChangeText={setApiKey}
+              placeholder="Enter API key for authentication"
+              placeholderTextColor="#6b7280"
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+            />
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Auto Sync (every 5 min)</Text>
+              <Switch
+                value={autoSync}
+                onValueChange={setAutoSync}
+                trackColor={{ false: theme.colors.border.medium, true: theme.colors.primary }}
+                thumbColor={theme.colors.white}
+              />
+            </View>
+            <View style={styles.buttonRow}>
+              <BrandedButton
+                title="Save Settings"
+                onPress={saveBackendSettings}
+                variant="outline"
+                style={{ flex: 1 }}
+              />
+              <BrandedButton
+                title="Test Connection"
+                onPress={testBackendConnection}
+                disabled={isSyncing}
+                loading={isSyncing}
+                variant="outline"
+                style={{ flex: 1 }}
+              />
+            </View>
+            <BrandedButton
+              title={isSyncing ? 'Syncing...' : 'Sync Now'}
+              onPress={syncToBackend}
+              disabled={isSyncing || !backendUrl}
+              loading={isSyncing}
+              style={{ marginTop: theme.spacing.sm }}
+            />
+            {syncStatus ? (
+              <Text style={styles.syncStatus}>{syncStatus}</Text>
+            ) : null}
+          </View>
+        </View>
+
+        {/* App Information Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>App Information</Text>
+          <SettingItem
+            title="Version"
+            description="1.0.0"
+            onPress={null}
+          />
+          <SettingItem
+            title="Scoring Standard"
+            description="ETSI TR 103 559"
+            onPress={null}
+          />
+          <SettingItem
+            title="About"
+            description="Crowdsourcing QoE Measurement App"
+            onPress={null}
+          />
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  mainContainer: {
     flex: 1,
     backgroundColor: theme.colors.background.secondary,
   },
+  container: {
+    flex: 1,
+  },
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.xl + 20,
+    paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing.lg,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+  headerTextSection: {
+    marginBottom: theme.spacing.lg,
   },
   subtitle: {
     fontSize: 14,
     color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.lg,
     lineHeight: 20,
   },
   section: {
@@ -683,25 +683,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
-  },
-  button: {
-    flex: 1,
-    padding: theme.spacing.sm + 4,
-    borderRadius: theme.borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...theme.shadows.sm,
-  },
-  buttonPrimary: {
-    backgroundColor: theme.colors.primary,
-  },
-  buttonSecondary: {
-    backgroundColor: theme.colors.gray,
-  },
-  buttonText: {
-    color: theme.colors.white,
-    fontSize: 14,
-    fontWeight: '600',
   },
   syncStatus: {
     color: theme.colors.text.secondary,

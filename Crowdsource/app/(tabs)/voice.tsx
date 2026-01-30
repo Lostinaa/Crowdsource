@@ -325,7 +325,11 @@ export default function VoiceScreen() {
     <View style={styles.container}>
       <ScreenHeader title="Voice Monitor" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.contentContainer}>
-        {/* Removed duplicate title/subtitle, kept content */}
+        <View style={styles.headerTextSection}>
+          <Text style={styles.subtitle}>
+            Monitor call setup success rate and call drop rate in real-time.
+          </Text>
+        </View>
 
         <View style={styles.statusBox}>
           <Text style={styles.statusTitle}>Status</Text>
@@ -468,14 +472,11 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.xl + 20,
+    paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing.lg,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+  headerTextSection: {
+    marginBottom: theme.spacing.lg,
   },
   subtitle: {
     fontSize: 14,

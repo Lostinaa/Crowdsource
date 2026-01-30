@@ -7,6 +7,7 @@ import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
 import DeviceDiagnosticModule from '../../CallMetrics/src/DeviceDiagnosticModule';
 import { backendApi } from '../../src/services/backendApi';
+import ScreenHeader from '../../src/components/ScreenHeader';
 
 // Ethio Telecom regions (simplified - you can expand this with actual region boundaries)
 const ETHIO_TELECOM_REGIONS = [
@@ -120,7 +121,7 @@ export default function MapScreen() {
           accuracy: Location.Accuracy.Balanced,
         });
         setLocation(loc);
-        
+
         // Set initial camera position on first location fix
         if (!hasSetInitialCamera.current && cameraRef.current) {
           try {
@@ -140,7 +141,7 @@ export default function MapScreen() {
               centerCoordinate: [loc.coords.longitude, loc.coords.latitude],
               zoomLevel: 15,
               animationDuration: 1000,
-        });
+            });
           } catch (error) {
             console.error('[Map] Camera update error:', error);
           }
@@ -254,7 +255,7 @@ export default function MapScreen() {
         // Load last 1000 samples from the last 7 days
         const endDate = new Date().toISOString();
         const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        
+
         const result = await backendApi.getCoverageSamples({
           startDate,
           endDate,
@@ -317,11 +318,13 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
+      <ScreenHeader title="Coverage Map" />
       <ScrollView style={styles.infoPanel} contentContainerStyle={styles.infoContent}>
-        <Text style={styles.title}>Network Coverage Map</Text>
-        <Text style={styles.subtitle}>
-          Displaying your geographic position and network technology distribution
-        </Text>
+        <View style={styles.headerTextSection}>
+          <Text style={styles.subtitle}>
+            Displaying your geographic position and network technology distribution
+          </Text>
+        </View>
 
         {/* Location Info */}
         <View style={styles.infoBox}>
@@ -407,8 +410,8 @@ export default function MapScreen() {
               </Text>
             </View>
           ) : (
-          <MapView
-            style={styles.map}
+            <MapView
+              style={styles.map}
               mapStyle="https://api.maptiler.com/maps/streets-v2/style.json?key=akWntIEAlqH2TssZK7gt"
               onDidFailLoadingMap={() => {
                 console.error("MapLibre: Failed to load map");
@@ -417,9 +420,9 @@ export default function MapScreen() {
             >
               {/* Camera will be positioned once on first location fix */}
               <Camera ref={cameraRef} />
-              
+
               {/* User location marker */}
-            {location && (
+              {location && (
                 <PointAnnotation
                   key={`user-location-${networkCategory}`}
                   id="user-location"
@@ -435,60 +438,60 @@ export default function MapScreen() {
                       borderWidth: 3,
                       borderColor: '#fff',
                       elevation: 4,
-                  }}
-                />
+                    }}
+                  />
                 </PointAnnotation>
-            )}
+              )}
 
-            {/* Historical coverage samples from backend */}
-            {historicalSamples.map(point => (
-              <PointAnnotation
-                key={point.id}
-                id={point.id}
-                coordinate={[point.longitude, point.latitude]}
-              >
-                <View
-                  style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: 6,
-                    backgroundColor: NETWORK_COLORS[point.category],
-                    borderWidth: 1,
-                    borderColor: 'white',
-                    opacity: 0.7,
-                  }}
-                />
-              </PointAnnotation>
-            ))}
-            
-            {/* Current session coverage trail markers (nPerf-style dots) */}
-            {trackPoints.map(point => (
-              <PointAnnotation
-                key={point.id}
-                id={point.id}
-                coordinate={[point.longitude, point.latitude]}
-              >
-                <View
-                  style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: 7,
-                    backgroundColor: NETWORK_COLORS[point.category],
-                    borderWidth: 1,
-                    borderColor: 'white',
-                    opacity: 0.9,
-                  }}
-                />
-              </PointAnnotation>
-            ))}
-              
-            {/* Region markers */}
-            {ETHIO_TELECOM_REGIONS.map((region, index) => (
+              {/* Historical coverage samples from backend */}
+              {historicalSamples.map(point => (
                 <PointAnnotation
-                key={index}
+                  key={point.id}
+                  id={point.id}
+                  coordinate={[point.longitude, point.latitude]}
+                >
+                  <View
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
+                      backgroundColor: NETWORK_COLORS[point.category],
+                      borderWidth: 1,
+                      borderColor: 'white',
+                      opacity: 0.7,
+                    }}
+                  />
+                </PointAnnotation>
+              ))}
+
+              {/* Current session coverage trail markers (nPerf-style dots) */}
+              {trackPoints.map(point => (
+                <PointAnnotation
+                  key={point.id}
+                  id={point.id}
+                  coordinate={[point.longitude, point.latitude]}
+                >
+                  <View
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: 7,
+                      backgroundColor: NETWORK_COLORS[point.category],
+                      borderWidth: 1,
+                      borderColor: 'white',
+                      opacity: 0.9,
+                    }}
+                  />
+                </PointAnnotation>
+              ))}
+
+              {/* Region markers */}
+              {ETHIO_TELECOM_REGIONS.map((region, index) => (
+                <PointAnnotation
+                  key={index}
                   id={`region-${index}`}
                   coordinate={[region.bounds.longitude, region.bounds.latitude]}
-                title={region.name}
+                  title={region.name}
                 >
                   <View
                     style={{
@@ -499,10 +502,10 @@ export default function MapScreen() {
                       borderWidth: 2,
                       borderColor: '#fff',
                     }}
-              />
+                  />
                 </PointAnnotation>
-            ))}
-          </MapView>
+              ))}
+            </MapView>
           )
         ) : (
           <View style={styles.mapPlaceholder}>
@@ -511,16 +514,6 @@ export default function MapScreen() {
             </Text>
           </View>
         )}
-      </View>
-
-      {/* Compact legend at the bottom, aligned horizontally */}
-      <View style={styles.legendBar}>
-        {Object.entries(NETWORK_COLORS).map(([tech, color]) => (
-          <View key={tech} style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: color }]} />
-            <Text style={styles.legendLabel}>{tech}</Text>
-          </View>
-        ))}
       </View>
 
       {/* Compact legend at the bottom, aligned horizontally */}
@@ -542,25 +535,16 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.secondary,
   },
   infoPanel: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
     maxHeight: '40%',
-    zIndex: 1,
     backgroundColor: theme.colors.background.secondary,
-    opacity: 0.95,
   },
   infoContent: {
     paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.xl + 20,
+    paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.md,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+  headerTextSection: {
+    marginBottom: theme.spacing.md,
   },
   subtitle: {
     fontSize: 14,
@@ -648,7 +632,6 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     flex: 1,
-    marginTop: '40%',
     marginHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.sm,
     borderRadius: theme.borderRadius.lg,

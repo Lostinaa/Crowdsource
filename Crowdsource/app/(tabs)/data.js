@@ -6,6 +6,7 @@ import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
 import SpeedTestWebView from '../../src/components/SpeedTestWebView';
 import BrandedButton from '../../src/components/BrandedButton';
+import ScreenHeader from '../../src/components/ScreenHeader';
 import { FTP_CONFIG } from '../../src/constants/config';
 
 // Lazy-load FTP native module so the app doesn't crash in Expo Go
@@ -24,9 +25,28 @@ const getFTPClient = () => {
 };
 
 export default function DataScreen() {
-  const { metrics, scores, addBrowsingSample, addStreamingSample, addHttpSample, addSocialSample, addFtpSample, addLatencySample } = useQoE();
+  const {
+    metrics,
+    scores,
+    addBrowsingSample,
+    addStreamingSample,
+    addHttpSample,
+    addSocialSample,
+    addFtpSample,
+    addLatencySample,
+    runFullTest,
+    isTesting: isTestingContext
+  } = useQoE();
+
   const [isTesting, setIsTesting] = useState(false);
   const [networkState, setNetworkState] = useState(null);
+
+  // Sync local isTesting with context isTesting for full test
+  useEffect(() => {
+    if (isTestingContext) setIsTesting(true);
+    else setIsTesting(false);
+  }, [isTestingContext]);
+
   const [webViewVisible, setWebViewVisible] = useState(false);
   const [webViewTestType, setWebViewTestType] = useState(null);
   const webViewCompletedRef = useRef(false);
@@ -212,33 +232,7 @@ export default function DataScreen() {
     }
   };
   const fulltest = async () => {
-    if (isTesting) return;
-
-    const netState = await NetInfo.fetch();
-    if (!netState.isConnected) {
-      Alert.alert('No Internet', 'Please check your connection before starting the full test.');
-      return;
-    }
-
-    setIsTesting(true);
-
-    try {
-      // Step-by-step execution using silent mode to prevent multiple alerts
-      await testBrowsing({ silent: true, showAlert: false });
-      await testStreaming(true);
-      await testHttpDownload(true);
-      await testHttpUpload(true);
-      await testSocialMedia(true);
-      await testFtpDownload(true);
-      await testFtpUpload(true);
-      await testLatency(true);
-
-      Alert.alert('Full Test Complete', 'All QoE performance metrics have been updated.');
-    } catch (error) {
-      Alert.alert('Full Test Partial Failure', 'One or more tests failed to complete.');
-    } finally {
-      setIsTesting(false);
-    }
+    await runFullTest();
   };
 
   // Real streaming test with actual video/audio streaming
@@ -1047,12 +1041,14 @@ export default function DataScreen() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.mainContainer}>
+      <ScreenHeader title="Data Performance" />
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        <Text style={styles.title}>Data QoE</Text>
-        <Text style={styles.subtitle}>
-          Test browsing, streaming, file access, and social media performance metrics.
-        </Text>
+        <View style={styles.headerTextSection}>
+          <Text style={styles.subtitle}>
+            Test browsing, streaming, file access, and social media performance metrics.
+          </Text>
+        </View>
 
         {/* Network Status Indicator */}
         {networkState && (
@@ -1355,20 +1351,20 @@ export default function DataScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  mainContainer: {
     flex: 1,
     backgroundColor: theme.colors.background.secondary,
   },
+  container: {
+    flex: 1,
+  },
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.xl + 20,
+    paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing.lg,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+  headerTextSection: {
+    marginBottom: theme.spacing.lg,
   },
   subtitle: {
     fontSize: 14,

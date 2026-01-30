@@ -5,6 +5,7 @@
 
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import { BACKEND_CONFIG } from '../constants/config';
 
 /**
  * Determines the appropriate backend URL based on environment and platform.
@@ -19,10 +20,8 @@ import { Platform } from 'react-native';
  * to your server's actual IP address or domain.
  */
 const getDefaultBackendUrl = () => {
-  // Check environment variable first (recommended for all environments)
-  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
-    return process.env.EXPO_PUBLIC_BACKEND_URL;
-  }
+  // Use centralized configuration
+  return BACKEND_CONFIG.url;
 
   // For Android emulator, use 10.0.2.2 (special IP that maps to host's localhost)
   if (Platform.OS === 'android' && !Device.isDevice) {

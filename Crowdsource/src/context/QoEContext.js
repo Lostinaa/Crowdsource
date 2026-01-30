@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateScores } from '../utils/scoring';
+import * as Measurements from '../utils/measurements';
+import { Alert } from 'react-native';
 
 const HISTORY_STORAGE_KEY = '@qoe_history';
 const METRICS_STORAGE_KEY = '@qoe_metrics';
@@ -61,6 +63,9 @@ export const QoEProvider = ({ children }) => {
   const [metrics, setMetrics] = useState(createInitialMetrics);
   const [history, setHistory] = useState([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testProgress, setTestProgress] = useState(0);
+  const [testLabel, setTestLabel] = useState('');
 
   // ... (Load effect handled in previous step)
 
@@ -142,7 +147,7 @@ export const QoEProvider = ({ children }) => {
     setMetrics((current) => {
       const next = { ...current, voice: { ...current.voice } };
       const {
-        attempt = true,
+        attempt = false,
         setupSuccessful = false,
         callCompleted = false,
         dropped = false,
@@ -194,7 +199,7 @@ export const QoEProvider = ({ children }) => {
       };
 
       const {
-        request = true,
+        request = false,
         completed = false,
         throughputMbps,
       } = sample || {};
@@ -223,7 +228,7 @@ export const QoEProvider = ({ children }) => {
         },
       };
       const {
-        request = true,
+        request = false,
         completed = false,
         durationMs,
         dnsResolutionTimeMs,
@@ -266,7 +271,7 @@ export const QoEProvider = ({ children }) => {
         },
       };
       const {
-        request = true,
+        request = false,
         completed = false,
         mos,
         setupTimeMs,
@@ -323,7 +328,7 @@ export const QoEProvider = ({ children }) => {
         },
       };
       const {
-        request = true,
+        request = false,
         completed = false,
         durationMs,
         throughputKbps,
@@ -365,7 +370,7 @@ export const QoEProvider = ({ children }) => {
       };
 
       const {
-        request = true,
+        request = false,
         completed = false,
         throughputKbps,
       } = sample || {};
@@ -394,7 +399,7 @@ export const QoEProvider = ({ children }) => {
         },
       };
       const {
-        request = true,
+        request = false,
         completed = false,
         score, // Interactivity score (0-100)
       } = sample || {};
@@ -476,6 +481,54 @@ export const QoEProvider = ({ children }) => {
     }
   }, []);
 
+  const runFullTest = useCallback(async () => {
+    if (isTesting) return;
+    setIsTesting(true);
+    setTestProgress(0);
+    setTestLabel('Starting...');
+
+    try {
+      const tests = [
+        { label: 'Checking Latency...', fn: Measurements.runLatencyTest },
+        { label: 'Testing Browsing...', fn: Measurements.runBrowsingTest },
+        { label: 'Testing Streaming...', fn: Measurements.runStreamingTest },
+        { label: 'Measuring Download...', fn: Measurements.runHttpDownloadTest },
+        { label: 'Measuring Upload...', fn: Measurements.runHttpUploadTest },
+      ];
+
+      for (let i = 0; i < tests.length; i++) {
+        setTestLabel(tests[i].label);
+        setTestProgress(i / tests.length);
+        await tests[i].fn({
+          addBrowsingSample,
+          addStreamingSample,
+          addLatencySample,
+          addHttpSample,
+          silent: true
+        });
+        setTestProgress((i + 1) / tests.length);
+      }
+
+      setTestLabel('Complete!');
+      setTimeout(() => {
+        Alert.alert('Full Test Complete', 'Your QoE scores have been updated.');
+      }, 500);
+    } catch (error) {
+      console.error('[QoE] Full test error:', error);
+      Alert.alert('Test Interrupted', 'Something went wrong during the full test.');
+    } finally {
+      setIsTesting(false);
+      setTestProgress(0);
+      setTestLabel('');
+    }
+  }, [
+    isTesting,
+    addBrowsingSample,
+    addStreamingSample,
+    addLatencySample,
+    addHttpSample
+  ]);
+
   const value = useMemo(
     () => ({
       metrics,
@@ -491,6 +544,10 @@ export const QoEProvider = ({ children }) => {
       resetMetrics,
       saveHistoryEntry,
       clearHistory,
+      runFullTest,
+      isTesting,
+      testProgress,
+      testLabel,
     }),
     [
       metrics,
@@ -506,6 +563,10 @@ export const QoEProvider = ({ children }) => {
       resetMetrics,
       saveHistoryEntry,
       clearHistory,
+      runFullTest,
+      isTesting,
+      testProgress,
+      testLabel,
     ]
   );
 

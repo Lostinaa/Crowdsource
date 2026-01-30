@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, FlatList }
 import { useState, useEffect } from 'react';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
+import ScreenHeader from '../../src/components/ScreenHeader';
 
 export default function HistoryScreen() {
   const { metrics, scores, history, saveHistoryEntry, clearHistory } = useQoE();
@@ -197,95 +198,98 @@ export default function HistoryScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>QoE History</Text>
-      <Text style={styles.subtitle}>
-        View past QoE measurements and save snapshots of current metrics.
-      </Text>
+    <View style={styles.mainContainer}>
+      <ScreenHeader title="History" />
+      <View style={styles.container}>
+        <View style={styles.headerTextSection}>
+          <Text style={styles.subtitle}>
+            View past QoE measurements and save snapshots of current metrics.
+          </Text>
+        </View>
 
-      {/* Current Metrics Summary */}
-      <View style={styles.currentSummary}>
-        <Text style={styles.currentSummaryTitle}>Current Metrics</Text>
-        <View style={styles.currentSummaryRow}>
-          <Text style={styles.currentSummaryLabel}>Overall:</Text>
-          <Text style={styles.currentSummaryValue}>
-            {formatScore(scores.overall?.score)}
-          </Text>
+        {/* Current Metrics Summary */}
+        <View style={styles.currentSummary}>
+          <Text style={styles.currentSummaryTitle}>Current Metrics</Text>
+          <View style={styles.currentSummaryRow}>
+            <Text style={styles.currentSummaryLabel}>Overall:</Text>
+            <Text style={styles.currentSummaryValue}>
+              {formatScore(scores.overall?.score)}
+            </Text>
+          </View>
+          <View style={styles.currentSummaryRow}>
+            <Text style={styles.currentSummaryLabel}>Voice:</Text>
+            <Text style={styles.currentSummaryValue}>
+              {formatScore(scores.voice?.score)}
+            </Text>
+          </View>
+          <View style={styles.currentSummaryRow}>
+            <Text style={styles.currentSummaryLabel}>Data:</Text>
+            <Text style={styles.currentSummaryValue}>
+              {formatScore(scores.data?.score)}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.saveButton} onPress={handleSaveSnapshot}>
+            <Text style={styles.saveButtonText}>Save Snapshot</Text>
+          </TouchableOpacity>
         </View>
-        <View style={styles.currentSummaryRow}>
-          <Text style={styles.currentSummaryLabel}>Voice:</Text>
-          <Text style={styles.currentSummaryValue}>
-            {formatScore(scores.voice?.score)}
-          </Text>
-        </View>
-        <View style={styles.currentSummaryRow}>
-          <Text style={styles.currentSummaryLabel}>Data:</Text>
-          <Text style={styles.currentSummaryValue}>
-            {formatScore(scores.data?.score)}
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSaveSnapshot}>
-          <Text style={styles.saveButtonText}>Save Snapshot</Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* History List */}
-      <View style={styles.historySection}>
-        <View style={styles.historyHeader}>
-          <Text style={styles.historyTitle}>
-            History ({history.length} entries)
-          </Text>
-          {history.length > 0 && (
-            <TouchableOpacity onPress={handleClearHistory}>
-              <Text style={styles.clearButton}>Clear</Text>
-            </TouchableOpacity>
+        {/* History List */}
+        <View style={styles.historySection}>
+          <View style={styles.historyHeader}>
+            <Text style={styles.historyTitle}>
+              History ({history.length} entries)
+            </Text>
+            {history.length > 0 && (
+              <TouchableOpacity onPress={handleClearHistory}>
+                <Text style={styles.clearButton}>Clear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {history.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                No history entries yet.{'\n'}Save a snapshot to get started.
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={history}
+              renderItem={renderHistoryEntry}
+              keyExtractor={(item) => item.timestamp.toString()}
+              style={styles.historyList}
+              contentContainerStyle={styles.historyListContent}
+            />
           )}
         </View>
 
-        {history.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              No history entries yet.{'\n'}Save a snapshot to get started.
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={history}
-            renderItem={renderHistoryEntry}
-            keyExtractor={(item) => item.timestamp.toString()}
-            style={styles.historyList}
-            contentContainerStyle={styles.historyListContent}
-          />
+        {/* Selected Entry Details */}
+        {selectedEntry && (
+          <ScrollView style={styles.detailsScrollView}>
+            {renderEntryDetails(selectedEntry)}
+          </ScrollView>
         )}
       </View>
-
-      {/* Selected Entry Details */}
-      {selectedEntry && (
-        <ScrollView style={styles.detailsScrollView}>
-          {renderEntryDetails(selectedEntry)}
-        </ScrollView>
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  mainContainer: {
     flex: 1,
     backgroundColor: theme.colors.background.secondary,
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.xl + 20,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+  container: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.lg,
+  },
+  headerTextSection: {
+    marginBottom: theme.spacing.lg,
   },
   subtitle: {
     fontSize: 14,
     color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.lg,
     lineHeight: 20,
   },
   currentSummary: {

@@ -1,14 +1,13 @@
-import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useEffect } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
-import DrawerButton from '../../src/components/DrawerButton';
-import { useDrawer } from '../../src/context/DrawerContext';
+import ScreenHeader from '../../src/components/ScreenHeader';
+import DashboardFullTestButton from '../../src/components/DashboardFullTestButton';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function DashboardScreen() {
-  const { scores, metrics } = useQoE();
-  const { openDrawer } = useDrawer();
+  const { scores, runFullTest, isTesting, testProgress, testLabel } = useQoE();
 
   // Debug logging
   useEffect(() => {
@@ -16,48 +15,62 @@ export default function DashboardScreen() {
       overall: scores.overall.score,
       voice: scores.voice.score,
       data: scores.data.score,
-      voiceAppliedWeight: scores.voice.appliedWeight,
-      dataAppliedWeight: scores.data.appliedWeight,
     });
   }, [scores]);
+
 
   const formatScore = (value) => {
     if (value === null || value === undefined) return '--';
     return `${Math.round(value * 100)}%`;
   };
 
+  const getScoreColor = (value) => {
+    if (value === null || value === undefined) return theme.colors.gray;
+    if (value >= 0.8) return theme.colors.success;
+    if (value >= 0.5) return theme.colors.warning;
+    return theme.colors.danger;
+  };
+
   const scoreCards = [
-    { label: 'Overall QoE', value: formatScore(scores.overall.score) },
-    { label: 'Voice Score', value: formatScore(scores.voice.score) },
-    { label: 'Data Score', value: formatScore(scores.data.score) },
+    { label: 'Overall Quality', value: scores.overall.score, key: 'overall' },
+    { label: 'Voice Services', value: scores.voice.score, key: 'voice' },
+    { label: 'Data Services', value: scores.data.score, key: 'data' },
   ];
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Top brand bar: logo + app name + menu (matches Great Run style) */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Image
-            source={require('../../assets/images/ethiotelecomlogo.png')}
-            style={styles.logo}
-          />
-          <Text style={styles.headerTitle}>Crowdsourcing QoE</Text>
-        </View>
-        <DrawerButton onPress={openDrawer} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Crowdsourcing QoE" showLogo={true} />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        <Text style={styles.title}>Dashboard</Text>
-        <Text style={styles.subtitle}>
-          End-to-end QoE scoring using ETSI TR 103 559.
-        </Text>
+        <View style={styles.welcomeSection}>
+          <Text style={styles.subtitle}>
+            End-to-end QoE scoring using ETSI TR 103 559.
+          </Text>
+        </View>
 
         <View style={styles.cardsRow}>
           {scoreCards.map((card) => (
-            <View key={card.label} style={styles.card}>
+            <LinearGradient
+              key={card.key}
+              colors={['#ffffff', '#f8fafc']}
+              style={styles.card}
+            >
               <Text style={styles.cardLabel}>{card.label}</Text>
-              <Text style={[styles.cardValue, { color: theme.colors.primary }]}>{card.value}</Text>
-            </View>
+              <Text style={[styles.cardValue, { color: getScoreColor(card.value) }]}>
+                {formatScore(card.value)}
+              </Text>
+              <View style={[styles.progressBar, { backgroundColor: theme.colors.border.light }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${(card.value ?? 0) * 100}%`,
+                      backgroundColor: getScoreColor(card.value)
+                    }
+                  ]}
+                />
+              </View>
+            </LinearGradient>
           ))}
         </View>
 
@@ -70,59 +83,37 @@ export default function DashboardScreen() {
             Data sub-metrics coverage: {formatScore(scores.data.appliedWeight)}
           </Text>
         </View>
+
+        <DashboardFullTestButton
+          onPress={runFullTest}
+          isTesting={isTesting}
+          progress={testProgress}
+          testLabel={testLabel}
+        />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
     backgroundColor: theme.colors.background.secondary,
   },
   scrollView: {
     flex: 1,
   },
-  header: {
-    backgroundColor: theme.colors.background.primary,
-    borderBottomColor: theme.colors.border.light,
-    borderBottomWidth: 1,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-  },
-  logo: {
-    width: 64,
-    height: 64,
-    resizeMode: 'contain',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-  },
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing.lg,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+  welcomeSection: {
+    marginBottom: theme.spacing.lg,
   },
   subtitle: {
     fontSize: 14,
     color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.lg,
     lineHeight: 20,
   },
   cardsRow: {
@@ -132,7 +123,6 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    backgroundColor: theme.colors.background.card,
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.lg,
     ...theme.shadows.md,
@@ -141,14 +131,26 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     color: theme.colors.text.secondary,
-    fontSize: 13,
-    marginBottom: theme.spacing.xs,
+    fontSize: 11,
+    marginBottom: 4,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    fontWeight: '600',
   },
   cardValue: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: theme.spacing.sm,
+  },
+  progressBar: {
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
   },
   breakdown: {
     backgroundColor: theme.colors.background.card,
@@ -161,7 +163,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: theme.colors.text.primary,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: theme.spacing.sm,
   },
   sectionText: {
