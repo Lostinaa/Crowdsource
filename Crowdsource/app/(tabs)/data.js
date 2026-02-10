@@ -1046,11 +1046,7 @@ export default function DataScreen() {
     <View style={styles.mainContainer}>
       <ScreenHeader title="Data Performance" />
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.headerTextSection}>
-          <Text style={styles.subtitle}>
-            Test browsing, streaming, file access, and social media performance metrics.
-          </Text>
-        </View>
+
 
         {/* Network Status Indicator */}
         {networkState && (
@@ -1077,15 +1073,11 @@ export default function DataScreen() {
 
         {/* Primary Action — Full Test */}
         <View style={styles.heroSection}>
-          <Text style={styles.heroTitle}>Run Complete Test Suite</Text>
-          <Text style={styles.heroSubtitle}>Tests browsing, streaming, download, upload, social media, and latency</Text>
           <BrandedButton
-            title={isTesting ? "Testing in progress..." : "▶  Start Full Test"}
+            title={isTesting ? "Testing in progress..." : "▶  Run Full Test"}
             onPress={fulltest}
             disabled={isTesting}
             loading={isTesting}
-            style={{ paddingVertical: 16, borderRadius: 14 }}
-            textStyle={{ fontSize: 17, fontWeight: '700', letterSpacing: 0.5 }}
           />
         </View>
         <View style={styles.section}>
@@ -1204,7 +1196,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.lg,
+    paddingBottom: 100,
   },
   headerTextSection: {
     marginBottom: theme.spacing.lg,

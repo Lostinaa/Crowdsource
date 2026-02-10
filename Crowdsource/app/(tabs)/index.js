@@ -75,11 +75,7 @@ export default function DashboardScreen() {
       <ScreenHeader title="tele Crowdsource" showLogo={true} />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.welcomeSection}>
-          <Text style={styles.subtitle}>
-            Network Performance Metrics
-          </Text>
-        </View>
+
 
         <View style={styles.cardsColumn}>
           {kpiCards.map((card, index) => (
@@ -89,10 +85,10 @@ export default function DashboardScreen() {
                 style={styles.card}
               >
                 <View style={styles.cardContent}>
-                  <Text style={styles.cardLabel}>{card.label}</Text>
                   <Text style={[styles.cardValue, { color: card.color }]}>
                     {card.formatted}
                   </Text>
+                  <Text style={styles.cardLabel}>{card.label}</Text>
                 </View>
                 {/* Visual indicator bar */}
                 <View style={[styles.indicatorBar, { backgroundColor: card.color }]} />
@@ -125,7 +121,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: 100,
   },
   welcomeSection: {
     marginBottom: theme.spacing.md,
@@ -157,19 +153,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardContent: {
-    padding: theme.spacing.lg,
-    flexDirection: 'row',
+    padding: theme.spacing.md,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
   cardLabel: {
     color: theme.colors.text.secondary,
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: '600',
+    textAlign: 'center',
+    marginTop: theme.spacing.xs,
   },
   cardValue: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
+    textAlign: 'center',
   },
   indicatorBar: {
     height: 4,

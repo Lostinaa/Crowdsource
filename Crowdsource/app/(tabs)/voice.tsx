@@ -184,8 +184,9 @@ export default function VoiceScreen() {
         ];
 
         const results = await PermissionsAndroid.requestMultiple(permissions);
-        granted = results[PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE] === PermissionsAndroid.RESULTS.GRANTED;
+        const phoneGranted = results[PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE] === PermissionsAndroid.RESULTS.GRANTED;
         const callLogGranted = results[PermissionsAndroid.PERMISSIONS.READ_CALL_LOG] === PermissionsAndroid.RESULTS.GRANTED;
+        granted = phoneGranted;
 
         if (!granted) {
           // Permission denied - check if we should show rationale
@@ -288,11 +289,7 @@ export default function VoiceScreen() {
     <View style={styles.container}>
       <ScreenHeader title="Voice Monitor" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.headerTextSection}>
-          <Text style={styles.subtitle}>
-            Monitor call setup success rate and call drop rate in real-time.
-          </Text>
-        </View>
+
 
         <View style={styles.statusBox}>
           <Text style={styles.statusTitle}>Status</Text>
@@ -346,6 +343,27 @@ export default function VoiceScreen() {
 
 
         </View>
+
+        {/* Call Disconnect Reason */}
+        <View style={styles.metricsBox}>
+          <Text style={styles.sectionTitle}>Last Disconnect Reason</Text>
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Reason</Text>
+            <Text style={styles.metricValue}>
+              {metrics.voice.reasons?.length > 0
+                ? metrics.voice.reasons[metrics.voice.reasons.length - 1].label
+                : 'No data yet'}
+            </Text>
+          </View>
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Source</Text>
+            <Text style={styles.metricValue}>
+              {metrics.voice.reasons?.length > 0
+                ? metrics.voice.reasons[metrics.voice.reasons.length - 1].source || '--'
+                : '--'}
+            </Text>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -359,7 +377,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.lg,
+    paddingBottom: 100,
   },
   headerTextSection: {
     marginBottom: theme.spacing.lg,

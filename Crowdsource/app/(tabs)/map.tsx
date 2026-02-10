@@ -319,86 +319,15 @@ export default function MapScreen() {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Coverage Map" />
-      <ScrollView style={styles.infoPanel} contentContainerStyle={styles.infoContent}>
-        <View style={styles.headerTextSection}>
-          <Text style={styles.subtitle}>
-            Displaying your geographic position and network technology distribution
-          </Text>
+      {/* Compact info bar above map */}
+      <View style={styles.compactInfoBar}>
+        <Text style={styles.compactInfoText}>📍 {currentRegion}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={[styles.networkIndicator, { backgroundColor: networkColor }]} />
+          <Text style={styles.compactInfoText}>{diagnostics?.netType || networkCategory}</Text>
         </View>
-
-        {/* Location Info */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Geographic Position</Text>
-          {location ? (
-            <>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Latitude:</Text>
-                <Text style={styles.infoValue}>{location.coords.latitude.toFixed(6)}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Longitude:</Text>
-                <Text style={styles.infoValue}>{location.coords.longitude.toFixed(6)}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Accuracy:</Text>
-                <Text style={styles.infoValue}>{Math.round(location.coords.accuracy)}m</Text>
-              </View>
-            </>
-          ) : (
-            <Text style={styles.infoValue}>Location not available</Text>
-          )}
-        </View>
-
-        {/* Region Info */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Ethio Telecom Region</Text>
-          <Text style={styles.infoValue}>{currentRegion}</Text>
-        </View>
-
-        {/* Network Technology Info */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Network Technology</Text>
-          <View style={styles.infoRow}>
-            <View style={[styles.networkIndicator, { backgroundColor: networkColor }]} />
-            <Text style={styles.infoValue}>{diagnostics?.netType || networkCategory}</Text>
-          </View>
-          {/* Debug: show how we're categorizing for color */}
-          <Text style={styles.infoSubtext}>
-            Category (color driver): {networkCategory} ({networkColor})
-          </Text>
-          {diagnostics?.netType && (
-            <Text style={styles.infoSubtext}>
-              Reported: {diagnostics.netType}
-            </Text>
-          )}
-          {networkState?.details?.cellularGeneration && (
-            <Text style={styles.infoSubtext}>
-              Generation: {networkState.details.cellularGeneration}
-            </Text>
-          )}
-        </View>
-
-        {/* Network Technology Legend (compact, moved to bottom near map) */}
-
-        {/* Serving Site Info (placeholder - would need actual cell tower data) */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Serving Site</Text>
-          <Text style={styles.infoSubtext}>
-            Site ID (eNB): {diagnostics?.enb || 'N/A'}
-          </Text>
-          <Text style={styles.infoSubtext}>
-            Cell ID: {diagnostics?.cellId || networkState?.details?.cellId || 'N/A'}
-          </Text>
-          <Text style={styles.infoSubtext}>
-            RSRP: {diagnostics?.rsrp ? `${diagnostics.rsrp} dBm` : 'N/A'}
-          </Text>
-          {networkState?.details?.carrier && (
-            <Text style={styles.infoSubtext}>
-              Carrier: {networkState.details.carrier}
-            </Text>
-          )}
-        </View>
-      </ScrollView>
+        <Text style={styles.compactInfoText}>RSRP: {diagnostics?.rsrp ? `${diagnostics.rsrp} dBm` : 'N/A'}</Text>
+      </View>
 
       {/* Map View */}
       <View style={styles.mapContainer}>
@@ -534,23 +463,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background.secondary,
   },
-  infoPanel: {
-    maxHeight: '40%',
-    backgroundColor: theme.colors.background.secondary,
-  },
-  infoContent: {
+  compactInfoBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.background.card,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border.light,
   },
-  headerTextSection: {
-    marginBottom: theme.spacing.md,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.md,
-    lineHeight: 20,
+  compactInfoText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
   },
   infoBox: {
     backgroundColor: theme.colors.background.card,

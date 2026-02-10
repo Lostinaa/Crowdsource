@@ -1,33 +1,23 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  PermissionsAndroid,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  Linking
 } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
 import { theme } from '../../src/constants/theme';
 import ScreenHeader from '../../src/components/ScreenHeader';
 
-// ✅ Modern Expo Modules way to import your Kotlin module
+// Modern Expo Modules way to import Kotlin module
 const DeviceDiagnosticModule = requireNativeModule('DeviceDiagnosticModule');
 
-const Card = ({ title, children, accent = "#007AFF" }) => (
-  <View style={[styles.card, { borderTopColor: accent }]}>
-    <Text style={[styles.cardTitle, { color: accent }]}>{title}</Text>
-    <View style={styles.grid}>{children}</View>
-  </View>
-);
-
-const Kpi = ({ label, value, color = "#1C1C1E" }) => (
-  <View style={styles.kpiContainer}>
-    <Text style={styles.kpiLabel}>{label}</Text>
-    <Text style={[styles.kpiValue, { color }]}>{value || '---'}</Text>
+const InfoRow = ({ label, value }) => (
+  <View style={styles.infoRow}>
+    <Text style={styles.infoLabel}>{label}</Text>
+    <Text style={styles.infoValue}>{value || 'N/A'}</Text>
   </View>
 );
 
@@ -37,7 +27,6 @@ export default function NetworkTab() {
 
   const fetchDiagnostics = useCallback(async () => {
     try {
-      // ✅ Using the AsyncFunction defined in our Kotlin module
       const res = await DeviceDiagnosticModule.getFullDiagnostics();
       setData({ ...res, _ts: new Date().toLocaleTimeString() });
     } catch (error) {
@@ -48,68 +37,8 @@ export default function NetworkTab() {
   }, []);
 
   useEffect(() => {
-    const requestFullPermissions = async () => {
-      if (Platform.OS !== 'android') return;
-
-      try {
-        // STEP 1: Request Foreground Location & Phone State
-        const foregroundPerms = [
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
-        ];
-
-        const granted = await PermissionsAndroid.requestMultiple(foregroundPerms);
-
-        const isFineLocationGranted =
-          granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] === PermissionsAndroid.RESULTS.GRANTED;
-
-        // STEP 2: Request Background Location (Only if Foreground is granted first)
-        if (isFineLocationGranted && Platform.Version >= 29) {
-          const backgroundStatus = await PermissionsAndroid.check(
-            PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION
-          );
-
-          if (!backgroundStatus) {
-            Alert.alert(
-              "Permission Needed!",
-              "Background Location Permission Needed to get your device network coverage information while you are not using this app! Would you please select 'Allow all time' in the next screen.",
-              [
-                { text: "Cancel", style: "cancel" },
-                {
-                  text: "OK",
-                  onPress: async () => {
-                    // Triggering the direct system request
-                    // NOTE: On Android 11+, this triggers the system settings redirect
-                    const bgGranted = await PermissionsAndroid.request(
-                      PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION
-                    );
-
-                    if (bgGranted !== PermissionsAndroid.RESULTS.GRANTED) {
-                      // If they didn't select 'Allow all the time', we prompt them to go to settings manually
-                      Alert.alert(
-                        "Action Required",
-                        "You selected 'Only while using'. To get full coverage info, please go to Permissions > Location and select 'Allow all the time'.",
-                        [
-                          { text: "Later", style: "cancel" },
-                          { text: "Go to Settings", onPress: () => Linking.openSettings() }
-                        ]
-                      );
-                    }
-                  }
-                }
-              ]
-            );
-          }
-        }
-
-        // Initial fetch
-        fetchDiagnostics();
-      } catch (err) {
-        console.warn(err);
-      }
-    };
-
-    requestFullPermissions();
+    // Just fetch diagnostics — location permissions are handled by the map tab
+    fetchDiagnostics();
     const interval = setInterval(fetchDiagnostics, 2000);
     return () => clearInterval(interval);
   }, [fetchDiagnostics]);
@@ -119,68 +48,56 @@ export default function NetworkTab() {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Network Monitor" />
-      <ScrollView style={styles.scrollContent}>
+      <ScrollView style={styles.scrollContent} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Signal Strength */}
         <View style={styles.infoCard}>
-          <Text style={styles.cardTitle}>Network Quality</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Signal Strength (RSRP):</Text>
-            <Text style={styles.infoValue}>{data?.rsrp ? `${data.rsrp} dBm` : 'N/A'}</Text>
-          </View>
+          <Text style={styles.cardTitle}>Signal Quality</Text>
+          <InfoRow label="RSRP" value={data?.rsrp ? `${data.rsrp} dBm` : null} />
+          <InfoRow label="RSRQ" value={data?.rsrq ? `${data.rsrq} dB` : null} />
+          <InfoRow label="SINR" value={data?.rssnr ? `${data.rssnr} dB` : null} />
         </View>
 
-        {/* Network States - Simplified */}
+        {/* Serving Cell */}
+        <View style={styles.infoCard}>
+          <Text style={styles.cardTitle}>Serving Cell</Text>
+          <InfoRow label="eNB (Site ID)" value={data?.enb} />
+          <InfoRow label="Cell ID" value={data?.cellId} />
+          <InfoRow label="PCI" value={data?.pci} />
+          <InfoRow label="TAC" value={data?.tac} />
+          <InfoRow label="Network Type" value={data?.netType} />
+        </View>
+
+        {/* Network States */}
         <View style={styles.infoCard}>
           <Text style={styles.cardTitle}>Network States</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Data State:</Text>
-            <Text style={styles.infoValue}>{data?.dataState || 'N/A'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Roaming:</Text>
-            <Text style={styles.infoValue}>{data?.isRoaming ? 'Yes' : 'No'}</Text>
-          </View>
+          <InfoRow label="Data State" value={data?.dataState} />
+          <InfoRow label="Roaming" value={data?.isRoaming ? 'Yes' : 'No'} />
         </View>
 
-        {/* Device Information */}
+        {/* GPS Location */}
         <View style={styles.infoCard}>
-          <Text style={styles.cardTitle}>Device Information</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Model:</Text>
-            <Text style={styles.infoValue}>{data?.model || 'N/A'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Manufacturer:</Text>
-            <Text style={styles.infoValue}>{data?.brand || 'N/A'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>OS Version:</Text>
-            <Text style={styles.infoValue}>{data?.version || 'N/A'}</Text>
-          </View>
-        </View>
-
-        {/* GPS Location Info */}
-        <View style={styles.infoCard}>
-          <Text style={styles.cardTitle}>GPS Location Info</Text>
+          <Text style={styles.cardTitle}>GPS Location</Text>
           {data?.lat && data?.lon ? (
             <>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Latitude:</Text>
-                <Text style={styles.infoValue}>{Number(data.lat).toFixed(6)}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Longitude:</Text>
-                <Text style={styles.infoValue}>{Number(data.lon).toFixed(6)}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Accuracy:</Text>
-                <Text style={styles.infoValue}>{data.accuracy ? Number(data.accuracy).toFixed(1) + 'm' : 'N/A'}</Text>
-              </View>
+              <InfoRow label="Latitude" value={Number(data.lat).toFixed(6)} />
+              <InfoRow label="Longitude" value={Number(data.lon).toFixed(6)} />
+              <InfoRow label="Accuracy" value={data.accuracy ? `${Number(data.accuracy).toFixed(1)}m` : null} />
             </>
           ) : (
             <Text style={styles.infoValue}>Waiting for location...</Text>
           )}
         </View>
+
+        {/* Device Information */}
+        <View style={styles.infoCard}>
+          <Text style={styles.cardTitle}>Device Information</Text>
+          <InfoRow label="Model" value={data?.model} />
+          <InfoRow label="Manufacturer" value={data?.brand} />
+          <InfoRow label="OS Version" value={data?.version} />
+        </View>
+
+        {/* Last updated */}
+        <Text style={styles.updateText}>Last updated: {data?._ts || '--'}</Text>
       </ScrollView>
     </View>
   );
@@ -194,7 +111,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.lg,
   },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   infoCard: {
@@ -228,5 +144,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: theme.colors.text.primary,
-  }
+  },
+  updateText: {
+    fontSize: 11,
+    color: theme.colors.text.light,
+    textAlign: 'center',
+    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.lg,
+  },
 });
