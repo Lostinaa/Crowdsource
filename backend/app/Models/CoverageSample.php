@@ -27,6 +27,7 @@ class CoverageSample extends Model
         'tac',
         'eci',
         'raw',
+        'region',
     ];
 
     protected $casts = [

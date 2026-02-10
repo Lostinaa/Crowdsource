@@ -145,7 +145,7 @@ export const runLatencyTest = async ({ addLatencySample, silent = false }) => {
         const latencyScore = Math.max(0, Math.min(100, 100 - ((avgLatency - 100) / 9)));
         const interactivityScore = Math.round((successRatio * 50) + (latencyScore * 0.5));
 
-        addLatencySample({ completed: true, score: interactivityScore });
+        addLatencySample({ completed: true, score: interactivityScore, latencyMs: avgLatency });
         return { success: true, score: interactivityScore, avgLatency };
     } catch (error) {
         console.error('[Measurements] Latency test error:', error);

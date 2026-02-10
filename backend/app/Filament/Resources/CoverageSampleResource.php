@@ -49,7 +49,7 @@ class CoverageSampleResource extends Resource
                             ->required(),
                     ])
                     ->columns(2),
-                
+
                 Forms\Components\Section::make('Location')
                     ->schema([
                         Forms\Components\TextInput::make('latitude')
@@ -66,7 +66,7 @@ class CoverageSampleResource extends Resource
                             ->suffix('m'),
                     ])
                     ->columns(3),
-                
+
                 Forms\Components\Section::make('Network Information')
                     ->schema([
                         Forms\Components\TextInput::make('network_type')
@@ -94,7 +94,7 @@ class CoverageSampleResource extends Resource
                             ->label('CQI'),
                     ])
                     ->columns(3),
-                
+
                 Forms\Components\Section::make('Cell Information')
                     ->schema([
                         Forms\Components\TextInput::make('enb')
@@ -121,30 +121,30 @@ class CoverageSampleResource extends Resource
                     ->label('ID')
                     ->sortable()
                     ->searchable(),
-                
+
                 Tables\Columns\TextColumn::make('user.email')
                     ->label('User')
                     ->sortable()
                     ->searchable()
                     ->default('Anonymous'),
-                
+
                 Tables\Columns\TextColumn::make('timestamp')
                     ->dateTime()
                     ->sortable()
                     ->searchable(),
-                
+
                 Tables\Columns\TextColumn::make('latitude')
                     ->numeric(decimalPlaces: 6)
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('longitude')
                     ->numeric(decimalPlaces: 6)
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('network_category')
                     ->label('Network')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         '5G' => 'info',
                         '4G' => 'success',
                         '3G' => 'warning',
@@ -153,23 +153,30 @@ class CoverageSampleResource extends Resource
                     })
                     ->sortable()
                     ->searchable(),
-                
+
+                Tables\Columns\TextColumn::make('region')
+                    ->label('Region')
+                    ->sortable()
+                    ->searchable()
+                    ->badge()
+                    ->color('info'),
+
                 Tables\Columns\TextColumn::make('network_type')
                     ->label('Network Type')
                     ->searchable()
                     ->toggleable(),
-                
+
                 Tables\Columns\TextColumn::make('rsrp')
                     ->label('RSRP')
                     ->suffix(' dBm')
                     ->sortable()
                     ->toggleable(),
-                
+
                 Tables\Columns\TextColumn::make('cell_id')
                     ->label('Cell ID')
                     ->searchable()
                     ->toggleable(),
-                
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -180,7 +187,7 @@ class CoverageSampleResource extends Resource
                     ->relationship('user', 'email')
                     ->searchable()
                     ->preload(),
-                
+
                 Tables\Filters\SelectFilter::make('network_category')
                     ->label('Network Category')
                     ->options([
@@ -189,7 +196,7 @@ class CoverageSampleResource extends Resource
                         '4G' => '4G',
                         '5G' => '5G',
                     ]),
-                
+
                 Tables\Filters\Filter::make('timestamp')
                     ->form([
                         Forms\Components\DatePicker::make('created_from')
@@ -201,11 +208,11 @@ class CoverageSampleResource extends Resource
                         return $query
                             ->when(
                                 $data['created_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('timestamp', '>=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('timestamp', '>=', $date),
                             )
                             ->when(
                                 $data['created_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('timestamp', '<=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('timestamp', '<=', $date),
                             );
                     }),
             ])
@@ -216,6 +223,52 @@ class CoverageSampleResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\BulkAction::make('export_csv')
+                        ->label('Export to CSV')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->action(function (\Illuminate\Support\Collection $records) {
+                            $filename = 'coverage_samples_' . date('Y-m-d_H-i-s') . '.csv';
+                            $headers = [
+                                'Content-Type' => 'text/csv',
+                                'Content-Disposition' => "attachment; filename=\"$filename\"",
+                            ];
+
+                            $callback = function () use ($records) {
+                                $file = fopen('php://output', 'w');
+                                fputcsv($file, [
+                                    'ID',
+                                    'Email',
+                                    'Timestamp',
+                                    'Lat',
+                                    'Lon',
+                                    'Region',
+                                    'Network',
+                                    'Type',
+                                    'RSRP',
+                                    'Cell ID',
+                                    'eNB'
+                                ]);
+
+                                foreach ($records as $record) {
+                                    fputcsv($file, [
+                                        $record->id,
+                                        $record->user?->email ?? 'Anonymous',
+                                        $record->timestamp,
+                                        $record->latitude,
+                                        $record->longitude,
+                                        $record->region,
+                                        $record->network_category,
+                                        $record->network_type,
+                                        $record->rsrp,
+                                        $record->cell_id,
+                                        $record->enb,
+                                    ]);
+                                }
+                                fclose($file);
+                            };
+
+                            return response()->stream($callback, 200, $headers);
+                        }),
                 ]),
             ])
             ->defaultSort('timestamp', 'desc');

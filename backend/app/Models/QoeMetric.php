@@ -16,6 +16,7 @@ class QoeMetric extends Model
         'location',
         'metrics',
         'scores',
+        'region',
         'ip_address',
         'user_agent',
     ];

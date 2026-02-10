@@ -1,8 +1,6 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, Platform } from 'react-native';
 import BrandedButton from '../../src/components/BrandedButton';
 import { useState, useEffect } from 'react';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import * as Device from 'expo-device';
 import * as Location from 'expo-location';
 import { useQoE } from '../../src/context/QoEContext';
@@ -22,40 +20,38 @@ const DeviceDiagnosticModule = requireNativeModule('DeviceDiagnosticModule');
 
 export default function SettingsScreen() {
   const { metrics, scores, history, resetMetrics, clearHistory } = useQoE();
-  const [autoSave, setAutoSave] = useState(false);
-  const [backendUrl, setBackendUrl] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [autoSync, setAutoSync] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState('');
 
-  // Load settings
+  // Default: QA requested Push OFF by default
+  const [pushEnabled, setPushEnabled] = useState(false);
+
+  // Default: QA requested Auto-Sync ON by default (but hidden)
+  const [autoSync, setAutoSync] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Load settings (persisted overrides)
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const [key, sync, push] = await Promise.all([
-          AsyncStorage.getItem(BACKEND_API_KEY),
+        const [sync, push] = await Promise.all([
           AsyncStorage.getItem(AUTO_SYNC_KEY),
           AsyncStorage.getItem(PUSH_ENABLED_KEY),
         ]);
 
-        const getDefaultUrl = () => {
-          return BACKEND_CONFIG.url;
-        };
-        const backendUrlToUse = getDefaultUrl();
-        setBackendUrl(backendUrlToUse);
-        backendApi.setBackendUrl(backendUrlToUse);
-
-        if (key) {
-          setApiKey(key);
-          backendApi.setApiKey(key);
-        }
-        if (sync === 'true') {
+        // If explicit preference exists, use it. Otherwise default to TRUE for sync.
+        if (sync !== null) {
+          setAutoSync(sync === 'true');
+        } else {
+          // First run: Default to TRUE
           setAutoSync(true);
         }
-        // Default to true if not set
-        setPushEnabled(push !== 'false');
+
+        // If explicit preference exists, use it. Otherwise default to FALSE for push.
+        if (push !== null) {
+          setPushEnabled(push === 'true');
+        } else {
+          // First run: Default to FALSE
+          setPushEnabled(false);
+        }
       } catch (error) {
         console.error('[Settings] Failed to load settings:', error);
       }
@@ -87,7 +83,7 @@ export default function SettingsScreen() {
     }
   };
 
-  // Auto-sync when enabled
+  // Auto-sync logic (Background)
   useEffect(() => {
     if (autoSync && metrics && scores) {
       const syncInterval = setInterval(() => {
@@ -98,203 +94,9 @@ export default function SettingsScreen() {
     }
   }, [autoSync, metrics, scores]);
 
-  const exportToJSON = async () => {
-    try {
-      const data = {
-        exportDate: new Date().toISOString(),
-        currentMetrics: metrics,
-        currentScores: scores,
-        history: history,
-      };
-
-      const fileName = `qoe-export-${Date.now()}.json`;
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-
-      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(data, null, 2));
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Export QoE Data',
-        });
-        Alert.alert('Success', 'Data exported successfully!');
-      } else {
-        Alert.alert('Error', 'Sharing is not available on this device');
-      }
-    } catch (error) {
-      console.error('[Settings] Export error:', error);
-      Alert.alert('Error', 'Failed to export data: ' + error.message);
-    }
-  };
-
-  const exportToCSV = async () => {
-    try {
-      let csv = 'Timestamp,Overall Score,Voice Score,Data Score,Voice Attempts,Voice Completed,Voice Dropped,Browsing Requests,Browsing Completed,Streaming Requests,Streaming Completed,HTTP DL Requests,HTTP DL Completed,HTTP UL Requests,HTTP UL Completed,Social Requests,Social Completed\n';
-
-      // Add current metrics
-      const now = new Date().toISOString();
-      csv += `${now},${scores.overall?.score || ''},${scores.voice?.score || ''},${scores.data?.score || ''},`;
-      csv += `${metrics.voice.attempts},${metrics.voice.completed},${metrics.voice.dropped},`;
-      csv += `${metrics.data.browsing.requests},${metrics.data.browsing.completed},`;
-      csv += `${metrics.data.streaming.requests},${metrics.data.streaming.completed},`;
-      csv += `${metrics.data.http.dl.requests},${metrics.data.http.dl.completed},`;
-      csv += `${metrics.data.http.ul.requests},${metrics.data.http.ul.completed},`;
-      csv += `${metrics.data.social.requests},${metrics.data.social.completed}\n`;
-
-      // Add history entries
-      history.forEach((entry) => {
-        const timestamp = new Date(entry.timestamp).toISOString();
-        csv += `${timestamp},${entry.scores.overall?.score || ''},${entry.scores.voice?.score || ''},${entry.scores.data?.score || ''},`;
-        csv += `${entry.metrics.voice.attempts},${entry.metrics.voice.completed},${entry.metrics.voice.dropped},`;
-        csv += `${entry.metrics.data.browsing.requests},${entry.metrics.data.browsing.completed},`;
-        csv += `${entry.metrics.data.streaming.requests},${entry.metrics.data.streaming.completed},`;
-        csv += `${entry.metrics.data.http.dl.requests},${entry.metrics.data.http.dl.completed},`;
-        csv += `${entry.metrics.data.http.ul.requests},${entry.metrics.data.http.ul.completed},`;
-        csv += `${entry.metrics.data.social.requests},${entry.metrics.data.social.completed}\n`;
-      });
-
-      const fileName = `qoe-export-${Date.now()}.csv`;
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-
-      await FileSystem.writeAsStringAsync(fileUri, csv);
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'text/csv',
-          dialogTitle: 'Export QoE Data',
-        });
-        Alert.alert('Success', 'Data exported to CSV successfully !');
-      } else {
-        Alert.alert('Error', 'Sharing is not available on this device');
-      }
-    } catch (error) {
-      console.error('[Settings] CSV export error:', error);
-      Alert.alert('Error', 'Failed to export CSV: ' + error.message);
-    }
-  };
-
-  const handleResetMetrics = () => {
-    Alert.alert(
-      'Reset Metrics',
-      'Are you sure you want to reset all current metrics? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () => {
-            resetMetrics();
-            Alert.alert('Success', 'Metrics reset successfully!');
-          },
-        },
-      ]
-    );
-  };
-
-  const handleClearHistory = () => {
-    Alert.alert(
-      'Clear History',
-      'Are you sure you want to delete all history entries? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            await clearHistory();
-            Alert.alert('Success', 'History cleared successfully!');
-          },
-        },
-      ]
-    );
-  };
-
-  const saveBackendSettings = async () => {
-    try {
-      await Promise.all([
-        AsyncStorage.setItem(BACKEND_API_KEY, apiKey),
-        AsyncStorage.setItem(AUTO_SYNC_KEY, autoSync.toString()),
-      ]);
-      // backendApi.setBackendUrl(backendUrl); // Set on load based on ENV
-      backendApi.setApiKey(apiKey);
-      Alert.alert('Success', 'Backend settings saved!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save backend settings: ' + error.message);
-    }
-  };
-
-  const testBackendConnection = async () => {
-    setIsSyncing(true);
-    setSyncStatus('Testing connection...');
-    try {
-      const result = await backendApi.testConnection();
-      setSyncStatus(result.message);
-      Alert.alert(
-        result.success ? 'Success' : 'Failed',
-        result.message
-      );
-    } catch (error) {
-      setSyncStatus('Connection test failed');
-      Alert.alert('Error', 'Connection test failed: ' + error.message);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // const syncToBackend = async () => {
-  //   if (isSyncing) return;
-
-  //   setIsSyncing(true);
-  //   setSyncStatus('Syncing...');
-
-  //   try {
-  //     // Get device info
-  //     const deviceInfo = {
-  //       platform: Platform.OS,
-  //       model: Device.modelName || 'unknown',
-  //       osVersion: Platform.Version.toString(),
-  //       appVersion: '1.0.0',
-  //     };
-
-  //     // Get location if available
-  //     let location = null;
-  //     try {
-  //       const { status } = await Location.getForegroundPermissionsAsync();
-  //       if (status === 'granted') {
-  //         const loc = await Location.getCurrentPositionAsync({
-  //           accuracy: Location.Accuracy.Balanced,
-  //         });
-  //         location = {
-  //           latitude: loc.coords.latitude,
-  //           longitude: loc.coords.longitude,
-  //           accuracy: loc.coords.accuracy,
-  //           timestamp: loc.timestamp,
-  //         };
-  //       }
-  //     } catch (locError) {
-  //       console.warn('[Settings] Failed to get location:', locError);
-  //     }
-
-  //     const result = await backendApi.sendMetrics(metrics, scores, deviceInfo, location);
-
-  //     if (result.success) {
-  //       setSyncStatus('Sync successful');
-  //       Alert.alert('Success', 'Data synced to backend successfully!');
-  //     } else {
-  //       setSyncStatus('Sync failed: ' + result.error);
-  //       Alert.alert('Warning', 'Sync failed: ' + result.error);
-  //     }
-  //   } catch (error) {
-  //     setSyncStatus('Sync error: ' + error.message);
-  //     Alert.alert('Error', 'Failed to sync: ' + error.message);
-  //   } finally {
-  //     setIsSyncing(false);
-  //   }
-  // };
   const syncToBackend = async () => {
     if (isSyncing) return;
     setIsSyncing(true);
-    setSyncStatus('Syncing...');
 
     try {
       // 1. Fetch diagnostics from Native Module safely
@@ -308,10 +110,7 @@ export default function SettingsScreen() {
       }
 
       // 2. Assemble ONE FLAT Object
-      // We remove "signalQuality", "cellIdentity", etc. 
-      // This allows the backend to see "rsrp", "cellId", etc. as individual fields.
       const deviceInfo = {
-        // Device Details
         platform: Platform.OS,
         model: Device.modelName || 'unknown',
         osVersion: Platform.Version.toString(),
@@ -319,22 +118,16 @@ export default function SettingsScreen() {
         brand: diagnostics?.brand || Device.brand || 'N/A',
         Android_version: diagnostics?.Version || Platform.Version.toString(),
         operator: diagnostics?.operator || 'N/A',
-
-        // Signal KPIs (Now at root level)
         rsrp: diagnostics?.rsrp ?? 'N/A',
         rsrq: diagnostics?.rsrq ?? 'N/A',
         rssnr: diagnostics?.rssnr ?? 'N/A',
         cqi: diagnostics?.cqi ?? 'N/A',
         netType: diagnostics?.netType ?? 'N/A',
-
-        // Cell Identity KPIs (Now at root level)
         enb: diagnostics?.enb ?? 'N/A',
         cellId: diagnostics?.cellId ?? 'N/A',
         pci: diagnostics?.pci ?? 'N/A',
         tac: diagnostics?.tac ?? 'N/A',
         eci: diagnostics?.eci ?? 'N/A',
-
-        // Network State KPIs (Now at root level)
         dataState: diagnostics?.dataState ?? 'N/A',
         dataActivity: diagnostics?.dataActivity ?? 'N/A',
         callState: diagnostics?.callState ?? 'N/A',
@@ -360,22 +153,16 @@ export default function SettingsScreen() {
       }
 
       // 4. Send the flattened data to the backend
-      const result = await backendApi.sendMetrics(metrics, scores, deviceInfo, location);
+      await backendApi.sendMetrics(metrics, scores, deviceInfo, location);
+      console.log('[Settings] Auto-sync successful');
 
-      if (result.success) {
-        setSyncStatus('Sync successful');
-        Alert.alert('Success', 'Data synced successfully!');
-      } else {
-        setSyncStatus('Sync failed: ' + result.error);
-        Alert.alert('Warning', 'Sync failed: ' + result.error);
-      }
     } catch (error) {
-      setSyncStatus('Error: ' + error.message);
-      Alert.alert('Sync Error', error.message);
+      console.error('[Settings] Auto-sync failed:', error);
     } finally {
       setIsSyncing(false);
     }
   };
+
   const SettingItem = ({ title, description, onPress, rightComponent, danger = false }) => (
     <TouchableOpacity
       style={styles.settingItem}
@@ -400,65 +187,8 @@ export default function SettingsScreen() {
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         <View style={styles.headerTextSection}>
           <Text style={styles.subtitle}>
-            Configure app settings, export data, and manage your QoE measurements.
+            Configure app settings and view information.
           </Text>
-        </View>
-
-        {/* Data Export Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data Export</Text>
-          <SettingItem
-            title="Export to JSON"
-            description="Export all QoE data including current metrics and history"
-            onPress={exportToJSON}
-          />
-          <SettingItem
-            title="Export to CSV"
-            description="Export QoE data in CSV format for spreadsheet analysis"
-            onPress={exportToCSV}
-          />
-        </View>
-
-        {/* Data Management Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data Management</Text>
-          <SettingItem
-            title="Reset Current Metrics"
-            description="Clear all current QoE measurements (history will be preserved)"
-            onPress={handleResetMetrics}
-            danger={true}
-          />
-          <SettingItem
-            title="Clear History"
-            description={`Delete all ${history.length} saved history entries`}
-            onPress={handleClearHistory}
-            danger={true}
-          />
-        </View>
-
-        {/* Statistics Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Statistics</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>History Entries</Text>
-              <Text style={styles.statValue}>{history.length}</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Voice Attempts</Text>
-              <Text style={styles.statValue}>{metrics.voice.attempts}</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Data Tests</Text>
-              <Text style={styles.statValue}>
-                {metrics.data.browsing.requests +
-                  metrics.data.streaming.requests +
-                  metrics.data.http.dl.requests +
-                  metrics.data.http.ul.requests +
-                  metrics.data.social.requests}
-              </Text>
-            </View>
-          </View>
         </View>
 
         {/* Notifications Section */}
@@ -475,63 +205,6 @@ export default function SettingsScreen() {
               trackColor={{ false: theme.colors.border.medium, true: theme.colors.primary }}
               thumbColor={theme.colors.white}
             />
-          </View>
-        </View>
-
-        {/* Backend Sync Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Backend Sync</Text>
-          <View style={styles.backendConfig}>
-            <Text style={styles.inputLabel}>Backend URL</Text>
-            <Text style={[styles.inputLabel, { fontSize: 13, fontWeight: '400', marginBottom: 15, color: theme.colors.text.secondary }]}>
-              {process.env.EXPO_PUBLIC_BACKEND_URL || 'Using default configuration'}
-            </Text>
-            <Text style={styles.inputLabel}>API Key (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={apiKey}
-              onChangeText={setApiKey}
-              placeholder="Enter API key for authentication"
-              placeholderTextColor="#6b7280"
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
-            />
-            <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Auto Sync (every 5 min)</Text>
-              <Switch
-                value={autoSync}
-                onValueChange={setAutoSync}
-                trackColor={{ false: theme.colors.border.medium, true: theme.colors.primary }}
-                thumbColor={theme.colors.white}
-              />
-            </View>
-            <View style={styles.buttonRow}>
-              <BrandedButton
-                title="Save Settings"
-                onPress={saveBackendSettings}
-                variant="outline"
-                style={{ flex: 1 }}
-              />
-              <BrandedButton
-                title="Test Connection"
-                onPress={testBackendConnection}
-                disabled={isSyncing}
-                loading={isSyncing}
-                variant="outline"
-                style={{ flex: 1 }}
-              />
-            </View>
-            <BrandedButton
-              title={isSyncing ? 'Syncing...' : 'Sync Now'}
-              onPress={syncToBackend}
-              disabled={isSyncing || !backendUrl}
-              loading={isSyncing}
-              style={{ marginTop: theme.spacing.sm }}
-            />
-            {syncStatus ? (
-              <Text style={styles.syncStatus}>{syncStatus}</Text>
-            ) : null}
           </View>
         </View>
 

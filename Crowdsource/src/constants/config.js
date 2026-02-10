@@ -31,14 +31,14 @@ const getEnvNumber = (key, defaultValue) => {
 // FTP test configuration
 // Uses environment variables for flexibility across environments
 export const FTP_CONFIG = {
-  host: getEnvVar('EXPO_PUBLIC_FTP_HOST', 'ftp.dlp-test.com'),
+  host: getEnvVar('EXPO_PUBLIC_FTP_HOST', '10.186.97.194'),
   port: getEnvNumber('EXPO_PUBLIC_FTP_PORT', 21),
-  username: getEnvVar('EXPO_PUBLIC_FTP_USERNAME', 'anonymous'),
-  password: getEnvVar('EXPO_PUBLIC_FTP_PASSWORD', 'test@example.com'),
+  username: getEnvVar('EXPO_PUBLIC_FTP_USERNAME', 'huawei'),
+  password: getEnvVar('EXPO_PUBLIC_FTP_PASSWORD', 'huawei'),
 
   // Remote paths used for tests
-  downloadPath: getEnvVar('EXPO_PUBLIC_FTP_DOWNLOAD_PATH', '/FTP_README.txt'),
-  uploadPath: getEnvVar('EXPO_PUBLIC_FTP_UPLOAD_PATH', '/cs-qoe-test-upload.txt'),
+  downloadPath: getEnvVar('EXPO_PUBLIC_FTP_DOWNLOAD_PATH', '/OD355008370555876_51200.bin.0'),
+  uploadPath: getEnvVar('EXPO_PUBLIC_FTP_UPLOAD_PATH', '/upload/cs-qoe-test-upload.txt'),
 
   // Enable/disable real FTP tests
   enableRealFtp: getEnvBool('EXPO_PUBLIC_FTP_ENABLED', true),

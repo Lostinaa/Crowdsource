@@ -215,6 +215,13 @@ class QoeMetricResource extends Resource
                     })
                     ->limit(30),
 
+                Tables\Columns\TextColumn::make('region')
+                    ->label('Region')
+                    ->sortable()
+                    ->searchable()
+                    ->badge()
+                    ->color('info'),
+
                 Tables\Columns\TextColumn::make('metrics.voice.attempts')
                     ->label('Voice Attempts')
                     ->numeric()
@@ -319,6 +326,48 @@ class QoeMetricResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\BulkAction::make('export_csv')
+                        ->label('Export to CSV')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->action(function (\Illuminate\Support\Collection $records) {
+                            $filename = 'qoe_metrics_' . date('Y-m-d_H-i-s') . '.csv';
+                            $headers = [
+                                'Content-Type' => 'text/csv',
+                                'Content-Disposition' => "attachment; filename=\"$filename\"",
+                            ];
+
+                            $callback = function () use ($records) {
+                                $file = fopen('php://output', 'w');
+                                fputcsv($file, [
+                                    'ID',
+                                    'Email',
+                                    'Timestamp',
+                                    'Region',
+                                    'Overall Score',
+                                    'Voice Score',
+                                    'Data Score',
+                                    'Platform',
+                                    'Model'
+                                ]);
+
+                                foreach ($records as $record) {
+                                    fputcsv($file, [
+                                        $record->id,
+                                        $record->user?->email ?? 'Anonymous',
+                                        $record->timestamp,
+                                        $record->region,
+                                        ($record->scores['overall']['score'] ?? 0) * 100,
+                                        ($record->scores['voice']['score'] ?? 0) * 100,
+                                        ($record->scores['data']['score'] ?? 0) * 100,
+                                        $record->device_info['platform'] ?? 'N/A',
+                                        $record->device_info['model'] ?? 'N/A',
+                                    ]);
+                                }
+                                fclose($file);
+                            };
+
+                            return response()->stream($callback, 200, $headers);
+                        }),
                 ]),
             ])
             ->defaultSort('timestamp', 'desc');

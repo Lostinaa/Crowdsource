@@ -19,47 +19,10 @@ try {
   console.warn('[Voice] DeviceDiagnosticModule not available');
 }
 
-const DISCONNECT_CAUSES = {
-  1: "Unallocated (unassigned) number",
-  3: "No route to destination",
-  6: "Channel unacceptable",
-  16: "Normal call clearing",
-  17: "User busy",
-  18: "No user responding",
-  19: "User alerting, no answer",
-  21: "Call rejected",
-  22: "Number changed",
-  27: "Destination out of order",
-  28: "Invalid number format",
-  31: "Normal, unspecified",
-  34: "No circuit/channel available",
-  38: "Network out of order",
-  41: "Temporary failure",
-  42: "Switching equipment congestion",
-  44: "Requested circuit/channel not available",
-  47: "Resource unavailable, unspecified",
-  50: "Requested facility not subscribed",
-  57: "Bearer capability not authorized",
-  58: "Bearer capability not presently available",
-  63: "Service or option not available, unspecified",
-  65: "Bearer capability not implemented",
-  69: "Requested facility not implemented",
-  88: "Incompatible destination",
-  111: "Protocol error, unspecified",
-  127: "Interworking, unspecified",
-};
-
-const getDisconnectReason = (code, label) => {
-  if (code !== undefined && code !== null && DISCONNECT_CAUSES[code]) {
-    return `${DISCONNECT_CAUSES[code]} (${code})`;
-  }
-  return label ? `${label} (${code || '?'})` : `Unknown (${code || '?'})`;
-};
 
 export default function VoiceScreen() {
   const { addVoiceSample, metrics, scores } = useQoE();
-  const [lastEvent, setLastEvent] = useState(null);
-  const [lastReason, setLastReason] = useState(null);
+
   const [isListening, setIsListening] = useState(false);
   const [signalMos, setSignalMos] = useState(0);
   const callStartTimeRef = useRef(null);
@@ -130,7 +93,7 @@ export default function VoiceScreen() {
     const subscription = CallMetrics.addListener(
       'callMetrics:update',
       (payload: CallStateChangePayload) => {
-        setLastEvent(payload);
+
         const now = Date.now();
 
         console.log('[Voice] Call state changed:', payload.state, payload);
@@ -188,7 +151,7 @@ export default function VoiceScreen() {
 
     const sub = CallDisconnectModule.addListener('CallDisconnectEvent', (payload) => {
       console.log('[Voice] CallDisconnectEvent received:', payload);
-      setLastReason(payload);
+
       if (payload?.causeCode !== undefined || payload?.causeLabel) {
         addVoiceSample({
           attempt: false,
@@ -340,14 +303,14 @@ export default function VoiceScreen() {
 
         <View style={styles.buttonsRow}>
           <BrandedButton
-            title="Start listener"
+            title="Capture Metrics"
             onPress={handleStart}
             disabled={isListening}
             style={{ flex: 1 }}
             textStyle={{}}
           />
           <BrandedButton
-            title="Stop listener"
+            title="Stop Capturing"
             onPress={handleStop}
             disabled={!isListening}
             variant="outline"
@@ -396,69 +359,6 @@ export default function VoiceScreen() {
             </View>
           )}
 
-          <View style={styles.divider} />
-
-          <Text style={styles.subsectionTitle}>Raw Statistics</Text>
-
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Total Attempts</Text>
-            <Text style={styles.metricValue}>{metrics.voice.attempts}</Text>
-          </View>
-
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Setup Successful</Text>
-            <Text style={styles.metricValue}>{metrics.voice.setupOk}</Text>
-          </View>
-
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Calls Completed</Text>
-            <Text style={styles.metricValue}>{metrics.voice.completed}</Text>
-          </View>
-
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Calls Dropped</Text>
-            <Text style={styles.metricValue}>{metrics.voice.dropped}</Text>
-          </View>
-
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Setup Time Samples</Text>
-            <Text style={styles.metricValue}>{metrics.voice.setupTimes?.length || 0}</Text>
-          </View>
-
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>MOS Samples</Text>
-            <Text style={styles.metricValue}>{metrics.voice.mosSamples?.length || 0}</Text>
-          </View>
-        </View>
-
-        <View style={styles.lastEventBox}>
-          <Text style={styles.lastEventTitle}>Last call state event</Text>
-          <Text style={styles.lastEventText}>
-            {lastEvent
-              ? `${lastEvent.state} @ ${new Date(
-                lastEvent.timestamp
-              ).toLocaleTimeString()}`
-              : 'No events yet'}
-          </Text>
-          {lastEvent && (
-            <Text style={styles.eventDetails}>
-              Phone: {lastEvent.phoneNumber || 'N/A'}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.lastEventBox}>
-          <Text style={styles.lastEventTitle}>Last disconnect reason (native)</Text>
-          <Text style={styles.lastEventText}>
-            {lastReason
-              ? getDisconnectReason(lastReason.causeCode, lastReason.causeLabel)
-              : 'No disconnect causes yet'}
-          </Text>
-          {lastReason?.timestamp && (
-            <Text style={styles.eventDetails}>
-              At: {new Date(lastReason.timestamp).toLocaleTimeString()} · Source: {lastReason.source || 'native'}
-            </Text>
-          )}
         </View>
       </ScrollView>
     </View>
@@ -574,30 +474,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: theme.colors.border.light,
     marginVertical: theme.spacing.sm,
-  },
-  lastEventBox: {
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border.light,
-    marginBottom: theme.spacing.md,
-    ...theme.shadows.sm,
-  },
-  lastEventTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: theme.spacing.xs,
-  },
-  lastEventText: {
-    color: theme.colors.text.secondary,
-    fontSize: 14,
-  },
-  eventDetails: {
-    color: theme.colors.text.light,
-    fontSize: 12,
-    marginTop: 4,
   },
   noteText: {
     color: theme.colors.text.light,

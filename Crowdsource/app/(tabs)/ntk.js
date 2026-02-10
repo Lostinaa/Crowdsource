@@ -119,46 +119,68 @@ export default function NetworkTab() {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Network Monitor" />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.contentContainer}>
+      <ScrollView style={styles.scrollContent}>
+        {/* Signal Strength */}
+        <View style={styles.infoCard}>
+          <Text style={styles.cardTitle}>Network Quality</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Signal Strength (RSRP):</Text>
+            <Text style={styles.infoValue}>{data?.rsrp ? `${data.rsrp} dBm` : 'N/A'}</Text>
+          </View>
+        </View>
 
-        <Text style={styles.updateText}>Last Refresh: {data?._ts}</Text>
+        {/* Network States - Simplified */}
+        <View style={styles.infoCard}>
+          <Text style={styles.cardTitle}>Network States</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Data State:</Text>
+            <Text style={styles.infoValue}>{data?.dataState || 'N/A'}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Roaming:</Text>
+            <Text style={styles.infoValue}>{data?.isRoaming ? 'Yes' : 'No'}</Text>
+          </View>
+        </View>
 
-        <Card title="DEVICE INFORMATION" accent={theme.colors.purple}>
-          <Kpi label="Brand" value={data?.brand} />
-          <Kpi label="Model" value={data?.model} />
-          <Kpi label="Android Ver" value={data?.version} />
-          <Kpi label="Operator" value={data?.operator} color={theme.colors.primary} />
-        </Card>
+        {/* Device Information */}
+        <View style={styles.infoCard}>
+          <Text style={styles.cardTitle}>Device Information</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Model:</Text>
+            <Text style={styles.infoValue}>{data?.model || 'N/A'}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Manufacturer:</Text>
+            <Text style={styles.infoValue}>{data?.brand || 'N/A'}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>OS Version:</Text>
+            <Text style={styles.infoValue}>{data?.version || 'N/A'}</Text>
+          </View>
+        </View>
 
-        <Card title={`SIGNAL QUALITY (${data?.netType || 'N/A'})`} accent={theme.colors.primary}>
-          <Kpi label="RSRP" value={data?.rsrp ? data.rsrp + " dBm" : "---"} color={theme.colors.primary} />
-          <Kpi label="RSRQ" value={data?.rsrq ? data.rsrq + " dB" : "---"} color={theme.colors.warning} />
-          <Kpi label="RSSNR" value={data?.rssnr} color={theme.colors.success} />
-          <Kpi label="CQI" value={data?.cqi} color={theme.colors.purple} />
-        </Card>
-
-        <Card title="CELL IDENTITY" accent={theme.colors.success}>
-          <Kpi label="Site ID (eNB)" value={data?.enb} />
-          <Kpi label="Cell ID" value={data?.cellId} />
-          <Kpi label="PCI" value={data?.pci} />
-          <Kpi label="TAC" value={data?.tac} />
-          <Kpi label="ECI" value={data?.eci} />
-        </Card>
-
-        <Card title="NETWORK STATES" accent={theme.colors.primary}>
-          <Kpi label="Data State" value={data?.dataState} />
-          <Kpi label="Data Activity" value={data?.dataActivity} />
-          <Kpi label="Call State" value={data?.callState} />
-          <Kpi label="SIM State" value={data?.simState} />
-          <Kpi label="Roaming" value={data?.isRoaming} />
-        </Card>
-
-        <Card title="GPS LOCATION" accent={theme.colors.warning}>
-          <Kpi label="Latitude" value={data?.lat} />
-          <Kpi label="Longitude" value={data?.lon} />
-          <Kpi label="Accuracy" value={data?.accuracy ? data.accuracy + "m" : "---"} />
-          <Kpi label="Altitude" value={data?.alt ? data.alt + "m" : "---"} />
-        </Card>
+        {/* GPS Location Info */}
+        <View style={styles.infoCard}>
+          <Text style={styles.cardTitle}>GPS Location Info</Text>
+          {data?.lat && data?.lon ? (
+            <>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Latitude:</Text>
+                <Text style={styles.infoValue}>{data.lat.toFixed(6)}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Longitude:</Text>
+                <Text style={styles.infoValue}>{data.lon.toFixed(6)}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Accuracy:</Text>
+                <Text style={styles.infoValue}>{data.accuracy ? data.accuracy.toFixed(1) + 'm' : 'N/A'}</Text>
+              </View>
+            </>
+          ) : (
+            <Text style={styles.infoValue}>Waiting for location...</Text>
+          )}
+        </View>
       </ScrollView>
     </View>
   );
@@ -169,30 +191,42 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background.secondary,
   },
-  contentContainer: {
+  scrollContent: {
     paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.md, // Reduced top padding since header is separate
+    paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.lg,
   },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  updateText: { fontSize: 11, color: theme.colors.text.light, marginBottom: 15 },
-  card: {
+  infoCard: {
     backgroundColor: theme.colors.background.card,
     borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md - 1,
-    marginBottom: theme.spacing.md - 1,
-    borderTopWidth: 4,
-    ...theme.shadows.md
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+    ...theme.shadows.sm,
   },
   cardTitle: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-    marginBottom: theme.spacing.md - 1,
-    textTransform: 'uppercase'
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  kpiContainer: { width: '50%', marginBottom: theme.spacing.sm },
-  kpiLabel: { fontSize: 11, color: theme.colors.text.light, textTransform: 'uppercase' },
-  kpiValue: { fontSize: 16, fontWeight: '600', marginTop: 2, color: theme.colors.text.primary }
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  infoLabel: {
+    fontSize: 13,
+    color: theme.colors.text.secondary,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+  }
 });

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use App\Services\RegionHelper;
 
 class MetricsController extends Controller
 {
@@ -41,6 +42,10 @@ class MetricsController extends Controller
                 'location' => $request->input('location'),
                 'metrics' => $request->input('metrics'),
                 'scores' => $request->input('scores'),
+                'region' => RegionHelper::getRegion(
+                    $request->input('location.latitude'),
+                    $request->input('location.longitude')
+                ),
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);

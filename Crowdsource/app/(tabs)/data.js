@@ -125,6 +125,7 @@ export default function DataScreen() {
 
     try {
       const testUrl = 'https://www.google.com/favicon.ico';
+      //change url  https://ethiojobs.net/
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -375,6 +376,7 @@ export default function DataScreen() {
         // Fallback: estimate from setup time
         totalBytes = 100 * 1024; // Estimate 100KB
         streamTime = Date.now() - streamStart || 1000;
+
       }
 
       const totalTime = Date.now() - startTime;
@@ -622,7 +624,7 @@ export default function DataScreen() {
         console.log('[Data] Showing HTTP upload alert');
         Alert.alert(
           'HTTP Upload Result',
-          `Throughput: ${throughputMbps.toFixed(2)} Mbps\nSize: ${(testDataSize / 1024).toFixed(2)} KB`,
+          `Throughput: ${throughputMbps.toFixed(2)} Mbps\nSize: ${(testDataSize / 1024).toFixed(2)} KB`, //must be 5mb
         );
       }
     } catch (error) {
@@ -663,9 +665,9 @@ export default function DataScreen() {
     try {
       // Try multiple fallback URLs for social media API test
       const testUrls = [
+        'https://www.facebook.com',
+        'https://m.facebook.com',
         'https://jsonplaceholder.typicode.com/posts/1',
-        'https://httpbin.org/json',
-        'https://api.github.com/zen', // GitHub API (lightweight)
       ];
 
       let response = null;
@@ -677,7 +679,7 @@ export default function DataScreen() {
       for (const url of testUrls) {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout for real sites
 
           requestStart = Date.now();
           response = await fetch(url, {
@@ -798,7 +800,7 @@ export default function DataScreen() {
       // Add timeout wrapper for FTP download
       const downloadPromise = FTP.downloadFile(cleanLocalPath, FTP_CONFIG.downloadPath);
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('FTP download timeout after 15 seconds')), 15000)
+        setTimeout(() => reject(new Error('FTP download timeout after 60 seconds')), 60000)
       );
 
       await Promise.race([downloadPromise, timeoutPromise]);
@@ -888,7 +890,7 @@ export default function DataScreen() {
         password: FTP_CONFIG.password,
       });
 
-      const testDataSize = 100 * 1024; // 100KB
+      const testDataSize = 5 * 1024 * 1024; // 5MB for upload
       const testData = 'x'.repeat(testDataSize);
       const localPath = `${FileSystem.cacheDirectory}ftp-upload-test.txt`;
 
@@ -900,10 +902,10 @@ export default function DataScreen() {
 
       const startTime = Date.now();
 
-      // Add timeout wrapper for FTP upload (reduced to prevent crashes)
+      // Add timeout wrapper for FTP upload
       const uploadPromise = FTP.uploadFile(cleanLocalPath, FTP_CONFIG.uploadPath);
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('FTP upload timeout after 15 seconds')), 15000)
+        setTimeout(() => reject(new Error('FTP upload timeout after 60 seconds')), 60000)
       );
 
       await Promise.race([uploadPromise, timeoutPromise]);
@@ -1093,28 +1095,6 @@ export default function DataScreen() {
             }}
             disabled={isTesting}
           />
-          <View style={styles.metricsBox}>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Requests</Text>
-              <Text style={styles.metricValue}>{metrics.data.browsing.requests}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Completed</Text>
-              <Text style={styles.metricValue}>{metrics.data.browsing.completed}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Success Ratio</Text>
-              <Text style={styles.metricValue}>
-                {formatPercent(scores.browsing?.successRatio)}
-              </Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Avg Duration</Text>
-              <Text style={styles.metricValue}>
-                {formatTime(scores.browsing?.durationAvg)}
-              </Text>
-            </View>
-          </View>
         </View>
 
         {/* Streaming Metrics */}
@@ -1128,34 +1108,6 @@ export default function DataScreen() {
             }}
             disabled={isTesting}
           />
-          <View style={styles.metricsBox}>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Requests</Text>
-              <Text style={styles.metricValue}>{metrics.data.streaming.requests}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Completed</Text>
-              <Text style={styles.metricValue}>{metrics.data.streaming.completed}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Success Ratio</Text>
-              <Text style={styles.metricValue}>
-                {formatPercent(scores.streaming?.successRatio)}
-              </Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Avg Setup Time</Text>
-              <Text style={styles.metricValue}>
-                {formatTime(scores.streaming?.setupAvg)}
-              </Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Avg MOS</Text>
-              <Text style={styles.metricValue}>
-                {scores.streaming?.mosAvg?.toFixed(2) || '--'}
-              </Text>
-            </View>
-          </View>
         </View>
 
         {/* HTTP Metrics */}
@@ -1175,41 +1127,6 @@ export default function DataScreen() {
               style={{ flex: 1 }}
             />
           </View>
-          <View style={styles.metricsBox}>
-            <Text style={styles.subsectionTitle}>Download</Text>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Requests</Text>
-              <Text style={styles.metricValue}>{metrics.data.http.dl.requests}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Completed</Text>
-              <Text style={styles.metricValue}>{metrics.data.http.dl.completed}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Avg Throughput</Text>
-              <Text style={styles.metricValue}>
-                {formatThroughput((scores.http?.dlAvg || 0) * 1000)}
-              </Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <Text style={styles.subsectionTitle}>Upload</Text>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Requests</Text>
-              <Text style={styles.metricValue}>{metrics.data.http.ul.requests}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Completed</Text>
-              <Text style={styles.metricValue}>{metrics.data.http.ul.completed}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Avg Throughput</Text>
-              <Text style={styles.metricValue}>
-                {formatThroughput((scores.http?.ulAvg || 0) * 1000)}
-              </Text>
-            </View>
-          </View>
         </View>
 
         {/* Social Media Metrics */}
@@ -1220,28 +1137,6 @@ export default function DataScreen() {
             onPress={() => testSocialMedia()}
             disabled={isTesting}
           />
-          <View style={styles.metricsBox}>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Requests</Text>
-              <Text style={styles.metricValue}>{metrics.data.social.requests}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Completed</Text>
-              <Text style={styles.metricValue}>{metrics.data.social.completed}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Success Ratio</Text>
-              <Text style={styles.metricValue}>
-                {formatPercent(scores.social?.successRatio)}
-              </Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Avg Duration</Text>
-              <Text style={styles.metricValue}>
-                {formatTime(scores.social?.durationAvg)}
-              </Text>
-            </View>
-          </View>
         </View>
 
         {/* FTP Metrics */}
@@ -1261,27 +1156,6 @@ export default function DataScreen() {
               style={{ flex: 1 }}
             />
           </View>
-          <View style={styles.metricsBox}>
-            <Text style={styles.subsectionTitle}>Download</Text>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Requests</Text>
-              <Text style={styles.metricValue}>{metrics.data.ftp.dl.requests}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Completed</Text>
-              <Text style={styles.metricValue}>{metrics.data.ftp.dl.completed}</Text>
-            </View>
-            <View style={styles.divider} />
-            <Text style={styles.subsectionTitle}>Upload</Text>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Requests</Text>
-              <Text style={styles.metricValue}>{metrics.data.ftp.ul.requests}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Completed</Text>
-              <Text style={styles.metricValue}>{metrics.data.ftp.ul.completed}</Text>
-            </View>
-          </View>
         </View>
 
         {/* Latency & Interactivity Metrics */}
@@ -1295,32 +1169,6 @@ export default function DataScreen() {
             }}
             disabled={isTesting}
           />
-          <View style={styles.metricsBox}>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Requests</Text>
-              <Text style={styles.metricValue}>{metrics.data.latency.requests}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Completed</Text>
-              <Text style={styles.metricValue}>{metrics.data.latency.completed}</Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Success Ratio</Text>
-              <Text style={styles.metricValue}>
-                {formatPercent(metrics.data.latency.requests > 0
-                  ? metrics.data.latency.completed / metrics.data.latency.requests
-                  : null)}
-              </Text>
-            </View>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Avg Score</Text>
-              <Text style={styles.metricValue}>
-                {metrics.data.latency.scores.length > 0
-                  ? Math.round(metrics.data.latency.scores.reduce((a, b) => a + b, 0) / metrics.data.latency.scores.length)
-                  : '--'}
-              </Text>
-            </View>
-          </View>
         </View>
 
         {/* Data Score Summary */}

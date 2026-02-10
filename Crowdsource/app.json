@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "cs-qoe",
+    "name": "tele Crowdsource",
     "slug": "cs-qoe",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -29,7 +29,6 @@
         "READ_CALL_LOG",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
-        
       ]
     },
     "plugins": [

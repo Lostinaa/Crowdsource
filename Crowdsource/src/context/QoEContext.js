@@ -53,6 +53,7 @@ const createInitialMetrics = () => ({
       requests: 0,
       completed: 0,
       scores: [], // Interactivity scores (0-100)
+      latencies: [], // Raw latency in ms
     },
   },
 });
@@ -402,9 +403,10 @@ export const QoEProvider = ({ children }) => {
         request = false,
         completed = false,
         score, // Interactivity score (0-100)
+        latencyMs, // Raw latency in ms
       } = sample || {};
 
-      console.log('[Data] Latency sample:', { request, completed, score });
+      console.log('[Data] Latency sample:', { request, completed, score, latencyMs });
 
       if (request) next.data.latency.requests += 1;
       if (completed) next.data.latency.completed += 1;
@@ -412,6 +414,12 @@ export const QoEProvider = ({ children }) => {
         next.data.latency.scores = [
           ...next.data.latency.scores,
           score,
+        ];
+      }
+      if (typeof latencyMs === 'number') {
+        next.data.latency.latencies = [
+          ...(next.data.latency.latencies || []),
+          latencyMs,
         ];
       }
       return next;

@@ -29,7 +29,7 @@ class AdminPanelProvider extends PanelProvider
             ->login()
             // Brand the admin panel & login with Ethio telecom QoE identity
             ->brandName('Crowdsourcing QoE')
-            ->brandLogo(fn () => asset('images/ethiotelecom-logo.png'))
+            ->brandLogo(fn() => asset('images/ethiotelecom-logo.png'))
             ->colors([
                 // Match mobile app theme colors (Ethio telecom brand green)
                 'primary' => Color::hex('#8ec63f'), // Brand green (#8ec63f)
@@ -38,7 +38,7 @@ class AdminPanelProvider extends PanelProvider
                 'danger' => Color::hex('#EF4444'), // Danger red
                 'info' => Color::hex('#009FE3'), // Info blue
             ])
-            ->favicon(fn () => asset('images/ethiotelecom-logo.png'))
+            ->favicon(fn() => asset('images/ethiotelecom-logo.png'))
             ->darkMode(false) // Use light theme to match mobile app
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth('full')
@@ -49,11 +49,12 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
+                \App\Filament\Widgets\DailyQoeOverview::class,
                 \App\Filament\Widgets\QoeMetricsOverview::class,
                 \App\Filament\Widgets\QoeMetricsChart::class,
                 \App\Filament\Widgets\DataKpisWidget::class,
-                // Temporarily disabled due to Blade parse error in production.
-                // \App\Filament\Widgets\EnhancedAnalyticsWidget::class,
+                    // Temporarily disabled due to Blade parse error in production.
+                    // \App\Filament\Widgets\EnhancedAnalyticsWidget::class,
                 Widgets\AccountWidget::class,
             ])
             ->middleware([

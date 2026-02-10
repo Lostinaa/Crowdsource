@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use App\Services\AuditLogService;
+use App\Services\RegionHelper;
 
 class CoverageSampleController extends Controller
 {
@@ -59,6 +60,7 @@ class CoverageSampleController extends Controller
             'pci' => $request->input('pci'),
             'tac' => $request->input('tac'),
             'eci' => $request->input('eci'),
+            'region' => RegionHelper::getRegion($request->input('latitude'), $request->input('longitude')),
             'raw' => $request->input('raw'),
         ]);
 

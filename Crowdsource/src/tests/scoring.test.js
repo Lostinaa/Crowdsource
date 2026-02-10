@@ -528,3 +528,11 @@ describe('Edge Cases', () => {
         expect(() => calculateScores(metrics)).not.toThrow();
     });
 });
+     addVoiceSample({
+          attempt: false,
+          callCompleted: false,
+          dropped: false,
+          reasonCode: payload?.causeCode,
+          reasonLabel: payload?.causeLabel || 'Unknown',
+          reasonSource: payload?.source || 'native',
+        });

@@ -1,5 +1,4 @@
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { useEffect } from 'react';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
 import ScreenHeader from '../../src/components/ScreenHeader';
@@ -7,89 +6,109 @@ import DashboardFullTestButton from '../../src/components/DashboardFullTestButto
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function DashboardScreen() {
-  const { scores, runFullTest, isTesting, testProgress, testLabel } = useQoE();
+  const { metrics, runFullTest, isTesting, testProgress, testLabel } = useQoE();
 
-  // Debug logging
-  useEffect(() => {
-    console.log('[Dashboard] Scores updated:', {
-      overall: scores.overall.score,
-      voice: scores.voice.score,
-      data: scores.data.score,
-    });
-  }, [scores]);
-
-
-  const formatScore = (value) => {
-    if (value === null || value === undefined) return '--';
-    return `${Math.round(value * 100)}%`;
+  // Helper to safely get the latest valid metric
+  const getLatestMetric = (metricObj) => {
+    if (!metricObj?.throughputs || metricObj.throughputs.length === 0) return null;
+    return metricObj.throughputs[metricObj.throughputs.length - 1];
   };
 
-  const getScoreColor = (value) => {
-    if (value === null || value === undefined) return theme.colors.gray;
-    if (value >= 0.8) return theme.colors.success;
-    if (value >= 0.5) return theme.colors.warning;
+  const getLatestLatency = (metricObj) => {
+    if (!metricObj?.latencies || metricObj.latencies.length === 0) return null;
+    return metricObj.latencies[metricObj.latencies.length - 1]; // Return last sample
+  };
+
+  const downloadSpeed = getLatestMetric(metrics.data.http.dl);
+  const uploadSpeed = getLatestMetric(metrics.data.http.ul);
+  const latency = getLatestLatency(metrics.data.latency);
+
+  const formatSpeed = (mbps) => {
+    if (mbps === null || mbps === undefined) return '--';
+    return `${mbps.toFixed(1)} Mbps`;
+  };
+
+  const formatLatency = (ms) => {
+    if (ms === null || ms === undefined) return '--';
+    return `${Math.round(ms)} ms`;
+  };
+
+  const getScoreColor = (value, type) => {
+    if (value === null || value === undefined) return theme.colors.text.secondary;
+
+    if (type === 'latency') {
+      // Lower is better
+      if (value < 50) return theme.colors.success;
+      if (value < 100) return theme.colors.warning;
+      return theme.colors.danger;
+    }
+
+    // Higher is better
+    if (value > 10) return theme.colors.success;
+    if (value > 5) return theme.colors.warning;
     return theme.colors.danger;
   };
 
-  const scoreCards = [
-    { label: 'Overall Quality', value: scores.overall.score, key: 'overall' },
-    { label: 'Voice Services', value: scores.voice.score, key: 'voice' },
-    { label: 'Data Services', value: scores.data.score, key: 'data' },
+  const kpiCards = [
+    {
+      label: 'Download Speed',
+      value: downloadSpeed,
+      formatted: formatSpeed(downloadSpeed),
+      color: getScoreColor(downloadSpeed, 'speed')
+    },
+    {
+      label: 'Upload Speed',
+      value: uploadSpeed,
+      formatted: formatSpeed(uploadSpeed),
+      color: getScoreColor(uploadSpeed, 'speed')
+    },
+    {
+      label: 'Latency',
+      value: latency,
+      formatted: formatLatency(latency),
+      color: getScoreColor(latency, 'latency')
+    },
   ];
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Crowdsourcing QoE" showLogo={true} />
+      <ScreenHeader title="tele Crowdsource" showLogo={true} />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         <View style={styles.welcomeSection}>
           <Text style={styles.subtitle}>
-            End-to-end QoE scoring using ETSI TR 103 559.
+            Network Performance Metrics
           </Text>
         </View>
 
-        <View style={styles.cardsRow}>
-          {scoreCards.map((card) => (
-            <LinearGradient
-              key={card.key}
-              colors={['#ffffff', '#f8fafc']}
-              style={styles.card}
-            >
-              <Text style={styles.cardLabel}>{card.label}</Text>
-              <Text style={[styles.cardValue, { color: getScoreColor(card.value) }]}>
-                {formatScore(card.value)}
-              </Text>
-              <View style={[styles.progressBar, { backgroundColor: theme.colors.border.light }]}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${(card.value ?? 0) * 100}%`,
-                      backgroundColor: getScoreColor(card.value)
-                    }
-                  ]}
-                />
-              </View>
-            </LinearGradient>
+        <View style={styles.cardsColumn}>
+          {kpiCards.map((card, index) => (
+            <View key={index} style={styles.cardContainer}>
+              <LinearGradient
+                colors={['#ffffff', '#f8fafc']}
+                style={styles.card}
+              >
+                <View style={styles.cardContent}>
+                  <Text style={styles.cardLabel}>{card.label}</Text>
+                  <Text style={[styles.cardValue, { color: card.color }]}>
+                    {card.formatted}
+                  </Text>
+                </View>
+                {/* Visual indicator bar */}
+                <View style={[styles.indicatorBar, { backgroundColor: card.color }]} />
+              </LinearGradient>
+            </View>
           ))}
         </View>
 
-        <View style={styles.breakdown}>
-          <Text style={styles.sectionTitle}>Coverage</Text>
-          <Text style={styles.sectionText}>
-            Voice data coverage: {formatScore(scores.voice.appliedWeight)}
-          </Text>
-          <Text style={styles.sectionText}>
-            Data sub-metrics coverage: {formatScore(scores.data.appliedWeight)}
-          </Text>
+        <View style={styles.actionSection}>
+          <DashboardFullTestButton
+            onPress={runFullTest}
+            isTesting={isTesting}
+            progress={testProgress}
+            testLabel={testLabel}
+          />
         </View>
-
-        <DashboardFullTestButton
-          onPress={runFullTest}
-          isTesting={isTesting}
-          progress={testProgress}
-          testLabel={testLabel}
-        />
       </ScrollView>
     </View>
   );
@@ -106,71 +125,58 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl,
   },
   welcomeSection: {
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    alignItems: 'center',
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: theme.colors.text.secondary,
-    lineHeight: 20,
+    fontWeight: '500',
+    letterSpacing: 0.5,
   },
-  cardsRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.lg,
+  cardsColumn: {
+    flexDirection: 'column',
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.xl,
+  },
+  cardContainer: {
+    borderRadius: theme.borderRadius.lg,
+    ...theme.shadows.sm,
+    backgroundColor: '#fff',
   },
   card: {
-    flex: 1,
-    padding: theme.spacing.md,
     borderRadius: theme.borderRadius.lg,
-    ...theme.shadows.md,
     borderWidth: 1,
     borderColor: theme.colors.border.light,
+    overflow: 'hidden',
+  },
+  cardContent: {
+    padding: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   cardLabel: {
     color: theme.colors.text.secondary,
-    fontSize: 11,
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontSize: 15,
     fontWeight: '600',
   },
   cardValue: {
     fontSize: 22,
-    fontWeight: '800',
-    marginBottom: theme.spacing.sm,
-  },
-  progressBar: {
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  breakdown: {
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-    ...theme.shadows.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border.light,
-  },
-  sectionTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 16,
     fontWeight: '700',
-    marginBottom: theme.spacing.sm,
   },
-  sectionText: {
-    color: theme.colors.text.secondary,
-    fontSize: 14,
-    marginBottom: 6,
-    lineHeight: 20,
+  indicatorBar: {
+    height: 4,
+    width: '100%',
+    opacity: 0.8,
+  },
+  actionSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.spacing.sm,
   },
 });
 
