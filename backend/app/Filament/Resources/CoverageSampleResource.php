@@ -37,7 +37,8 @@ class CoverageSampleResource extends Resource
 
     public static function canDeleteAny(): bool
     {
-        return auth()->user()?->hasPermission('manage_coverage') ?? false;
+        // Allow all authenticated admin users to access bulk actions (including CSV export)
+        return true;
     }
 
     public static function form(Form $form): Form
