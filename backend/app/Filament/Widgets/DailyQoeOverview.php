@@ -9,7 +9,7 @@ use Carbon\Carbon;
 
 class DailyQoeOverview extends BaseWidget
 {
-    protected static ?string $heading = 'Daily QoE Performance';
+    protected ?string $heading = 'Daily QoE Performance';
 
     protected function getStats(): array
     {

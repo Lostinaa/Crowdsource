@@ -166,15 +166,15 @@ export default function NetworkTab() {
             <>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Latitude:</Text>
-                <Text style={styles.infoValue}>{data.lat.toFixed(6)}</Text>
+                <Text style={styles.infoValue}>{Number(data.lat).toFixed(6)}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Longitude:</Text>
-                <Text style={styles.infoValue}>{data.lon.toFixed(6)}</Text>
+                <Text style={styles.infoValue}>{Number(data.lon).toFixed(6)}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Accuracy:</Text>
-                <Text style={styles.infoValue}>{data.accuracy ? data.accuracy.toFixed(1) + 'm' : 'N/A'}</Text>
+                <Text style={styles.infoValue}>{data.accuracy ? Number(data.accuracy).toFixed(1) + 'm' : 'N/A'}</Text>
               </View>
             </>
           ) : (
