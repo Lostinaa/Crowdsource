@@ -4,11 +4,14 @@ namespace App\Filament\Widgets;
 
 use App\Models\QoeMetric;
 use Filament\Widgets\ChartWidget;
+use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Illuminate\Support\Carbon;
 
 class QoeMetricsChart extends ChartWidget
 {
-    protected static ?string $heading = 'QoE Scores & Voice KPIs Over Time (Last 7 Days)';
+    use InteractsWithPageFilters;
+
+    protected static ?string $heading = 'QoE Scores & Voice KPIs Over Time';
 
     protected static ?int $sort = 2;
 
@@ -16,10 +19,19 @@ class QoeMetricsChart extends ChartWidget
 
     protected function getData(): array
     {
-        // Get metrics from the last 7 days
-        $startDate = Carbon::now()->subDays(7);
-        $metrics = QoeMetric::where('timestamp', '>=', $startDate)
-            ->orderBy('timestamp')
+        $filterStart = $this->filters['startDate'] ?? Carbon::today()->subDays(7)->toDateString();
+        $filterEnd = $this->filters['endDate'] ?? Carbon::today()->toDateString();
+        $region = $this->filters['region'] ?? '';
+
+        $startDate = Carbon::parse($filterStart)->startOfDay();
+        $endDate = Carbon::parse($filterEnd)->endOfDay();
+
+        $query = QoeMetric::whereBetween('timestamp', [$startDate, $endDate]);
+        if ($region) {
+            $query->where('region', $region);
+        }
+
+        $metrics = $query->orderBy('timestamp')
             ->get()
             ->groupBy(function ($metric) {
                 return Carbon::parse($metric->timestamp)->format('Y-m-d');
@@ -34,42 +46,42 @@ class QoeMetricsChart extends ChartWidget
 
         foreach ($metrics as $date => $group) {
             $dates[] = Carbon::parse($date)->format('M d');
-            
+
             // Overall QoE Scores (FRS Section 4.3)
             $overallScores[] = round($group->avg(function ($metric) {
                 return ($metric->scores['overall']['score'] ?? 0) * 100;
             }), 1);
-            
+
             $voiceScores[] = round($group->avg(function ($metric) {
                 return ($metric->scores['voice']['score'] ?? 0) * 100;
             }), 1);
-            
+
             $dataScores[] = round($group->avg(function ($metric) {
                 return ($metric->scores['data']['score'] ?? 0) * 100;
             }), 1);
-            
+
             // Voice KPIs (FRS Section 4.1)
             $voiceAttempts = $group->sum(function ($metric) {
                 return $metric->metrics['voice']['attempts'] ?? 0;
             });
-            
+
             $voiceSetupOk = $group->sum(function ($metric) {
                 return $metric->metrics['voice']['setupOk'] ?? 0;
             });
-            
+
             $voiceCompleted = $group->sum(function ($metric) {
                 return $metric->metrics['voice']['completed'] ?? 0;
             });
-            
+
             $voiceDropped = $group->sum(function ($metric) {
                 return $metric->metrics['voice']['dropped'] ?? 0;
             });
-            
+
             // Calculate CSSR and CDR
             $cssr = $voiceAttempts > 0 ? ($voiceSetupOk / $voiceAttempts) * 100 : 0;
             $totalCalls = $voiceCompleted + $voiceDropped;
             $cdr = $totalCalls > 0 ? ($voiceDropped / $totalCalls) * 100 : 0;
-            
+
             $cssrValues[] = round($cssr, 1);
             $cdrValues[] = round($cdr, 1);
         }

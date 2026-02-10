@@ -1075,14 +1075,17 @@ export default function DataScreen() {
           </View>
         )}
 
-        {/* Browsing Metrics */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Do Full test</Text>
+        {/* Primary Action — Full Test */}
+        <View style={styles.heroSection}>
+          <Text style={styles.heroTitle}>Run Complete Test Suite</Text>
+          <Text style={styles.heroSubtitle}>Tests browsing, streaming, download, upload, social media, and latency</Text>
           <BrandedButton
-            title="Full test"
+            title={isTesting ? "Testing in progress..." : "▶  Start Full Test"}
             onPress={fulltest}
             disabled={isTesting}
             loading={isTesting}
+            style={{ paddingVertical: 16, borderRadius: 14 }}
+            textStyle={{ fontSize: 17, fontWeight: '700', letterSpacing: 0.5 }}
           />
         </View>
         <View style={styles.section}>
@@ -1171,16 +1174,8 @@ export default function DataScreen() {
           />
         </View>
 
-        {/* Data Score Summary */}
-        <View style={styles.summaryBox}>
-          <Text style={styles.sectionTitle}>Data QoE Score</Text>
-          <Text style={styles.scoreValue}>
-            {formatPercent(scores.data.score)}
-          </Text>
-          <Text style={styles.coverageText}>
-            Coverage: {formatPercent(scores.data.appliedWeight)}
-          </Text>
-        </View>
+
+
       </ScrollView>
 
       {/* WebView Speed Test Modal */}
@@ -1244,6 +1239,30 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: theme.spacing.lg,
+  },
+  heroSection: {
+    backgroundColor: theme.colors.background.card,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    alignItems: 'center',
+    ...theme.shadows.sm,
+  },
+  heroTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xs,
+    textAlign: 'center',
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    color: theme.colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.md,
+    lineHeight: 18,
   },
   sectionTitle: {
     fontSize: 18,

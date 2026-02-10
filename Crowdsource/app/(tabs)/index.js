@@ -138,11 +138,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   cardsColumn: {
-    flexDirection: 'column',
-    gap: theme.spacing.md,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
     marginBottom: theme.spacing.xl,
   },
   cardContainer: {
+    flex: 1,
+    minWidth: '28%',
     borderRadius: theme.borderRadius.lg,
     ...theme.shadows.sm,
     backgroundColor: '#fff',

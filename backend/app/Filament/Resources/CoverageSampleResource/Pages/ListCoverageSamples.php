@@ -25,18 +25,39 @@ class ListCoverageSamples extends ListRecords
 
                     return response()->streamDownload(function () use ($records) {
                         $file = fopen('php://output', 'w');
+
+                        // Full headers with all coverage data
                         fputcsv($file, [
                             'ID',
                             'Email',
                             'Timestamp',
-                            'Lat',
-                            'Lon',
                             'Region',
-                            'Network',
-                            'Type',
-                            'RSRP',
+                            // Location
+                            'Latitude',
+                            'Longitude',
+                            // Network
+                            'Network Category',
+                            'Network Type',
+                            'Operator',
+                            // Signal
+                            'RSRP (dBm)',
+                            'RSRQ (dB)',
+                            'SINR (dB)',
+                            'RSSI (dBm)',
+                            // Cell
                             'Cell ID',
                             'eNB',
+                            'TAC',
+                            'PCI',
+                            // Data State
+                            'Data State',
+                            'Roaming',
+                            // Device
+                            'Device Model',
+                            'Platform',
+                            'OS Version',
+                            // Meta
+                            'IP Address',
                         ]);
 
                         foreach ($records as $record) {
@@ -44,14 +65,33 @@ class ListCoverageSamples extends ListRecords
                                 $record->id,
                                 $record->user?->email ?? 'Anonymous',
                                 $record->timestamp,
+                                $record->region ?? 'Unknown',
+                                // Location
                                 $record->latitude,
                                 $record->longitude,
-                                $record->region ?? 'Unknown',
-                                $record->network_category,
-                                $record->network_type,
-                                $record->rsrp,
-                                $record->cell_id,
-                                $record->enb,
+                                // Network
+                                $record->network_category ?? '',
+                                $record->network_type ?? '',
+                                $record->operator ?? '',
+                                // Signal
+                                $record->rsrp ?? '',
+                                $record->rsrq ?? '',
+                                $record->sinr ?? '',
+                                $record->rssi ?? '',
+                                // Cell
+                                $record->cell_id ?? '',
+                                $record->enb ?? '',
+                                $record->tac ?? '',
+                                $record->pci ?? '',
+                                // Data State
+                                $record->data_state ?? '',
+                                $record->roaming ? 'Yes' : 'No',
+                                // Device
+                                $record->device_model ?? '',
+                                $record->platform ?? '',
+                                $record->os_version ?? '',
+                                // Meta
+                                $record->ip_address ?? '',
                             ]);
                         }
                         fclose($file);

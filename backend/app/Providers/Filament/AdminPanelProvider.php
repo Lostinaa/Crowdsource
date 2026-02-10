@@ -45,17 +45,13 @@ class AdminPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
-                Pages\Dashboard::class,
+                \App\Filament\Pages\Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                \App\Filament\Widgets\DailyQoeOverview::class,
                 \App\Filament\Widgets\QoeMetricsOverview::class,
                 \App\Filament\Widgets\QoeMetricsChart::class,
                 \App\Filament\Widgets\DataKpisWidget::class,
-                    // Temporarily disabled due to Blade parse error in production.
-                    // \App\Filament\Widgets\EnhancedAnalyticsWidget::class,
-                Widgets\AccountWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

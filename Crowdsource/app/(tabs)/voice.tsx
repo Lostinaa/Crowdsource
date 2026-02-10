@@ -297,7 +297,7 @@ export default function VoiceScreen() {
         <View style={styles.statusBox}>
           <Text style={styles.statusTitle}>Status</Text>
           <Text style={[styles.statusText, isListening && { color: theme.colors.success }]}>
-            {isListening ? '🟢 Listening for call events' : '⚪ Listener stopped'}
+            {isListening ? '🟢 Capturing call events' : '⚪ Capture stopped'}
           </Text>
         </View>
 
@@ -343,21 +343,7 @@ export default function VoiceScreen() {
             </Text>
           </View>
 
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Mean Opinion Score (MOS)</Text>
-            <Text style={styles.metricValue}>
-              {formatMOS(scores.voice.mosAvg)}
-            </Text>
-          </View>
 
-          {signalMos > 0 && (
-            <View style={styles.metricRow}>
-              <Text style={styles.metricLabel}>Current Signal MOS (Est.)</Text>
-              <Text style={styles.metricValue}>
-                {signalMos.toFixed(1)} 📶
-              </Text>
-            </View>
-          )}
 
         </View>
       </ScrollView>
