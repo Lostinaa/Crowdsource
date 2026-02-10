@@ -1,15 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState, useEffect, useRef } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 import { calculateScores } from '../utils/scoring';
 import * as Measurements from '../utils/measurements';
 import { Alert } from 'react-native';
-import { backendApi } from '../services/backendApi';
 
 const HISTORY_STORAGE_KEY = '@qoe_history';
 const METRICS_STORAGE_KEY = '@qoe_metrics';
 const MAX_HISTORY_ENTRIES = 100;
-const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 const createInitialMetrics = () => ({
   voice: {
@@ -89,53 +86,6 @@ export const QoEProvider = ({ children }) => {
     saveMetrics();
   }, [metrics, isLoaded]); // Add isLoaded dependency
 
-  // --- Auto-sync to backend every 5 minutes ---
-  const metricsRef = useRef(metrics);
-  const scoresRef = useRef(null);
-  useEffect(() => { metricsRef.current = metrics; }, [metrics]);
-
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    const syncToBackend = async () => {
-      const currentMetrics = metricsRef.current;
-      const currentScores = scoresRef.current;
-
-      // Skip if no data collected
-      const hasVoice = currentMetrics.voice.attempts > 0;
-      const hasData = currentMetrics.data.browsing.requests > 0 ||
-        currentMetrics.data.streaming.requests > 0 ||
-        currentMetrics.data.http.dl.requests > 0 ||
-        currentMetrics.data.latency.requests > 0;
-
-      if (!hasVoice && !hasData) {
-        console.log('[QoE] Auto-sync skipped: no metrics collected yet');
-        return;
-      }
-
-      try {
-        console.log('[QoE] Auto-sync: sending metrics to backend...');
-        const result = await backendApi.sendMetrics(
-          currentMetrics,
-          currentScores,
-          { platform: Platform.OS, model: 'auto-sync' },
-          null
-        );
-        console.log('[QoE] Auto-sync result:', result.success ? 'OK' : result.error);
-      } catch (error) {
-        console.warn('[QoE] Auto-sync failed:', error);
-      }
-    };
-
-    // Sync immediately on load, then every 5 minutes
-    const timeout = setTimeout(syncToBackend, 10000); // initial sync after 10s
-    const interval = setInterval(syncToBackend, AUTO_SYNC_INTERVAL_MS);
-
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
-  }, [isLoaded]);
   useEffect(() => {
     const loadStoredData = async () => {
       try {
@@ -478,7 +428,8 @@ export const QoEProvider = ({ children }) => {
   }, []);
 
   const scores = useMemo(() => calculateScores(metrics), [metrics]);
-  useEffect(() => { scoresRef.current = scores; }, [scores]);
+
+
 
   // Debug logging for data metrics
   useEffect(() => {

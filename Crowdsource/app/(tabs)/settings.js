@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, Platform } from 'react-native';
 import BrandedButton from '../../src/components/BrandedButton';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import * as Device from 'expo-device';
 import * as Location from 'expo-location';
 import { useQoE } from '../../src/context/QoEContext';
@@ -83,18 +83,15 @@ export default function SettingsScreen() {
     }
   };
 
-  // Auto-sync logic (Background)
-  useEffect(() => {
-    if (autoSync && metrics && scores) {
-      const syncInterval = setInterval(() => {
-        syncToBackend();
-      }, 300000); // Sync every 5 minutes
+  // Refs to keep latest metrics/scores without restarting the interval
+  const metricsRef = useRef(metrics);
+  const scoresRef = useRef(scores);
+  useEffect(() => { metricsRef.current = metrics; }, [metrics]);
+  useEffect(() => { scoresRef.current = scores; }, [scores]);
 
-      return () => clearInterval(syncInterval);
-    }
-  }, [autoSync, metrics, scores]);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
 
-  const syncToBackend = async () => {
+  const syncToBackend = useCallback(async () => {
     if (isSyncing) return;
     setIsSyncing(true);
 
@@ -109,7 +106,7 @@ export default function SettingsScreen() {
         }
       }
 
-      // 2. Assemble ONE FLAT Object
+      // 2. Assemble device info
       const deviceInfo = {
         platform: Platform.OS,
         model: Device.modelName || 'unknown',
@@ -152,16 +149,34 @@ export default function SettingsScreen() {
         console.warn('[Settings] Location error', locError);
       }
 
-      // 4. Send the flattened data to the backend
-      await backendApi.sendMetrics(metrics, scores, deviceInfo, location);
-      console.log('[Settings] Auto-sync successful');
+      // 4. Send the data to the backend
+      const currentMetrics = metricsRef.current;
+      const currentScores = scoresRef.current;
+      const result = await backendApi.sendMetrics(currentMetrics, currentScores, deviceInfo, location);
+      console.log('[Settings] Sync result:', result.success ? 'OK' : result.error);
+      setLastSyncTime(new Date().toLocaleTimeString());
 
     } catch (error) {
-      console.error('[Settings] Auto-sync failed:', error);
+      console.error('[Settings] Sync failed:', error);
     } finally {
       setIsSyncing(false);
     }
-  };
+  }, [isSyncing]);
+
+  // Auto-sync: stable interval that doesn't restart on metric changes
+  useEffect(() => {
+    if (!autoSync) return;
+
+    // Initial sync after 10 seconds
+    const timeout = setTimeout(syncToBackend, 10000);
+    // Then every 5 minutes
+    const interval = setInterval(syncToBackend, 300000);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, [autoSync, syncToBackend]);
 
   const SettingItem = ({ title, description, onPress, rightComponent, danger = false }) => (
     <TouchableOpacity

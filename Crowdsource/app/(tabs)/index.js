@@ -85,10 +85,10 @@ export default function DashboardScreen() {
                 style={styles.card}
               >
                 <View style={styles.cardContent}>
+                  <Text style={styles.cardLabel}>{card.label}</Text>
                   <Text style={[styles.cardValue, { color: card.color }]}>
                     {card.formatted}
                   </Text>
-                  <Text style={styles.cardLabel}>{card.label}</Text>
                 </View>
                 {/* Visual indicator bar */}
                 <View style={[styles.indicatorBar, { backgroundColor: card.color }]} />
@@ -134,14 +134,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   cardsColumn: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
     gap: theme.spacing.sm,
     marginBottom: theme.spacing.xl,
   },
   cardContainer: {
-    flex: 1,
-    minWidth: '28%',
     borderRadius: theme.borderRadius.lg,
     ...theme.shadows.sm,
     backgroundColor: '#fff',
@@ -153,21 +150,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardContent: {
-    padding: theme.spacing.md,
+    padding: theme.spacing.lg,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
   },
   cardLabel: {
     color: theme.colors.text.secondary,
-    fontSize: 11,
+    fontSize: 15,
     fontWeight: '600',
-    textAlign: 'center',
-    marginTop: theme.spacing.xs,
   },
   cardValue: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    textAlign: 'center',
   },
   indicatorBar: {
     height: 4,
