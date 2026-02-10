@@ -35,6 +35,11 @@ class QoeMetricResource extends Resource
         return auth()->user()?->hasPermission('manage_metrics') ?? false;
     }
 
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()?->hasPermission('manage_metrics') ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
