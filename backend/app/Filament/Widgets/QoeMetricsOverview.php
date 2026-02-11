@@ -44,8 +44,6 @@ class QoeMetricsOverview extends BaseWidget
         $uniqueUsers = $metrics->pluck('user_id')->filter()->unique()->count();
 
         // Voice KPIs
-        $avgVoiceScore = $this->avgScore($metrics, 'voice');
-        $prevAvgVoiceScore = $this->avgScore($prevMetrics, 'voice');
 
         $cssr = $this->calcCssr($metrics);
         $prevCssr = $this->calcCssr($prevMetrics);
@@ -67,15 +65,6 @@ class QoeMetricsOverview extends BaseWidget
                 fn() => 'primary',
             ),
 
-            // Voice Overall Score
-            $this->buildStat(
-                'Voice Score',
-                number_format($avgVoiceScore, 1) . '%',
-                $avgVoiceScore,
-                $prevAvgVoiceScore,
-                'heroicon-m-phone',
-                fn($v) => $v >= 80 ? 'success' : ($v >= 60 ? 'warning' : 'danger'),
-            ),
 
             // CSSR
             $this->buildStat(

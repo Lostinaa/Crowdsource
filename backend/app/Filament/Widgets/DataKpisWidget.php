@@ -39,8 +39,6 @@ class DataKpisWidget extends BaseWidget
         $prevMetrics = $prevQuery->get();
 
         // Data KPIs
-        $avgDataScore = $this->avgScore($metrics, 'data');
-        $prevAvgDataScore = $this->avgScore($prevMetrics, 'data');
 
         $httpDlSuccess = $this->successRatio($metrics, 'data.http.dl');
         $prevHttpDlSuccess = $this->successRatio($prevMetrics, 'data.http.dl');
@@ -58,7 +56,6 @@ class DataKpisWidget extends BaseWidget
         $prevSocialSuccess = $this->successRatio($prevMetrics, 'data.social');
 
         return [
-            $this->buildStat('Data Score', number_format($avgDataScore, 1) . '%', $avgDataScore, $prevAvgDataScore, 'heroicon-m-globe-alt', fn($v) => $v >= 80 ? 'success' : ($v >= 60 ? 'warning' : 'danger')),
             $this->buildStat('Data Testing', number_format($httpDlSuccess, 1) . '%', $httpDlSuccess, $prevHttpDlSuccess, 'heroicon-m-arrow-down-tray', fn($v) => $v >= 80 ? 'success' : ($v >= 60 ? 'warning' : 'danger')),
             $this->buildStat('Browsing', number_format($browsingSuccess, 1) . '%', $browsingSuccess, $prevBrowsingSuccess, 'heroicon-m-globe-alt', fn($v) => $v >= 80 ? 'success' : ($v >= 60 ? 'warning' : 'danger')),
             $this->buildStat('Streaming', number_format($streamingSuccess, 1) . '%', $streamingSuccess, $prevStreamingSuccess, 'heroicon-m-play-circle', fn($v) => $v >= 80 ? 'success' : ($v >= 60 ? 'warning' : 'danger')),

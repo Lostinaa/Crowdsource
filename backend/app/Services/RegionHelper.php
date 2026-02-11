@@ -5,102 +5,77 @@ namespace App\Services;
 class RegionHelper
 {
     /**
-     * Ethio Telecom regions with rough coordinate boundaries
-     * Derived from the mobile app's map implementation
+     * Cached zone polygons loaded from config/ethio_zones.php
      */
-    protected static $regions = [
-        [
-            'name' => 'Addis Ababa',
-            'latitude' => 9.02497,
-            'longitude' => 38.74689,
-            'latitudeDelta' => 0.5,
-            'longitudeDelta' => 0.5
-        ],
-        [
-            'name' => 'Oromia',
-            'latitude' => 8.9806,
-            'longitude' => 38.7578,
-            'latitudeDelta' => 2.0,
-            'longitudeDelta' => 2.0
-        ],
-        [
-            'name' => 'Amhara',
-            'latitude' => 11.8251,
-            'longitude' => 37.7815,
-            'latitudeDelta' => 2.0,
-            'longitudeDelta' => 2.0
-        ],
-        [
-            'name' => 'Tigray',
-            'latitude' => 14.0324,
-            'longitude' => 38.3166,
-            'latitudeDelta' => 2.0,
-            'longitudeDelta' => 2.0
-        ],
-        [
-            'name' => 'SNNPR',
-            'latitude' => 6.5157,
-            'longitude' => 36.9541,
-            'latitudeDelta' => 2.0,
-            'longitudeDelta' => 2.0
-        ],
-        [
-            'name' => 'Afar',
-            'latitude' => 11.7556,
-            'longitude' => 40.9587,
-            'latitudeDelta' => 2.0,
-            'longitudeDelta' => 2.0
-        ],
-        [
-            'name' => 'Somali',
-            'latitude' => 6.6612,
-            'longitude' => 43.7908,
-            'latitudeDelta' => 2.0,
-            'longitudeDelta' => 2.0
-        ],
-        [
-            'name' => 'Gambela',
-            'latitude' => 8.1280,
-            'longitude' => 34.5621,
-            'latitudeDelta' => 1.0,
-            'longitudeDelta' => 1.0
-        ],
-        [
-            'name' => 'Harari',
-            'latitude' => 9.3099,
-            'longitude' => 42.1283,
-            'latitudeDelta' => 0.5,
-            'longitudeDelta' => 0.5
-        ],
-        [
-            'name' => 'Dire Dawa',
-            'latitude' => 9.6009,
-            'longitude' => 41.8501,
-            'latitudeDelta' => 0.5,
-            'longitudeDelta' => 0.5
-        ],
-    ];
+    protected static ?array $zones = null;
 
     /**
-     * Map coordinates to a region name
+     * Load zone polygon data (lazy, cached).
      */
-    public static function getRegion($lat, $lon)
+    protected static function loadZones(): array
+    {
+        if (self::$zones === null) {
+            self::$zones = require base_path('config/ethio_zones.php');
+        }
+        return self::$zones;
+    }
+
+    /**
+     * Map coordinates to an Ethio Telecom zone code using point-in-polygon.
+     * Uses ray-casting algorithm for accurate polygon containment checks.
+     */
+    public static function getRegion($lat, $lon): string
     {
         if (!$lat || !$lon) {
             return 'Unknown';
         }
 
-        foreach (self::$regions as $region) {
-            $minLat = $region['latitude'] - $region['latitudeDelta'] / 2;
-            $maxLat = $region['latitude'] + $region['latitudeDelta'] / 2;
-            $minLon = $region['longitude'] - $region['longitudeDelta'] / 2;
-            $maxLon = $region['longitude'] + $region['longitudeDelta'] / 2;
+        $lat = (float) $lat;
+        $lon = (float) $lon;
+        $zones = self::loadZones();
 
-            if ($lat >= $minLat && $lat <= $maxLat && $lon >= $minLon && $lon <= $maxLon) {
-                return $region['name'];
+        foreach ($zones as $zoneName => $polygon) {
+            if (self::pointInPolygon($lat, $lon, $polygon)) {
+                return $zoneName;
             }
         }
 
         return 'Unknown';
+    }
+
+    /**
+     * Ray-casting algorithm to check if a point is inside a polygon.
+     * Each polygon vertex is [lat, lon].
+     */
+    protected static function pointInPolygon(float $lat, float $lon, array $polygon): bool
+    {
+        $n = count($polygon);
+        if ($n < 3)
+            return false;
+
+        $inside = false;
+        for ($i = 0, $j = $n - 1; $i < $n; $j = $i++) {
+            $yi = $polygon[$i][0]; // lat
+            $xi = $polygon[$i][1]; // lon
+            $yj = $polygon[$j][0];
+            $xj = $polygon[$j][1];
+
+            if (
+                (($yi > $lat) !== ($yj > $lat)) &&
+                ($lon < ($xj - $xi) * ($lat - $yi) / ($yj - $yi) + $xi)
+            ) {
+                $inside = !$inside;
+            }
+        }
+
+        return $inside;
+    }
+
+    /**
+     * Get all available zone codes.
+     */
+    public static function getZoneCodes(): array
+    {
+        return array_keys(self::loadZones());
     }
 }
