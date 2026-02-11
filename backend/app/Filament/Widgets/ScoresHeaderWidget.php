@@ -12,15 +12,22 @@ class ScoresHeaderWidget extends BaseWidget
 {
     use InteractsWithPageFilters;
 
-    protected static ?int $sort = 0;
+    protected static ?int $sort = -10;
 
     protected int|string|array $columnSpan = 'full';
+
+    protected ?string $heading = 'Overall QoE Scores';
+
+    /**
+     * Standard weighting: Voice 40%, Data 60%
+     */
+    private const VOICE_WEIGHT = 0.40;
+    private const DATA_WEIGHT = 0.60;
 
     protected function getStats(): array
     {
         $startDate = $this->filters['startDate'] ?? Carbon::today()->toDateString();
         $endDate = $this->filters['endDate'] ?? Carbon::today()->toDateString();
-        $region = $this->filters['region'] ?? '';
 
         $start = Carbon::parse($startDate)->startOfDay();
         $end = Carbon::parse($endDate)->endOfDay();
@@ -29,19 +36,8 @@ class ScoresHeaderWidget extends BaseWidget
         $prevStart = $start->copy()->subDays($periodDays);
         $prevEnd = $start->copy()->subDay()->endOfDay();
 
-        $query = QoeMetric::whereBetween('timestamp', [$start, $end]);
-        $prevQuery = QoeMetric::whereBetween('timestamp', [$prevStart, $prevEnd]);
-
-        if ($region) {
-            $query->where('region', $region);
-            $prevQuery->where('region', $region);
-        }
-
-        $metrics = $query->get();
-        $prevMetrics = $prevQuery->get();
-
-        $overallScore = $this->avgScore($metrics, 'overall');
-        $prevOverallScore = $this->avgScore($prevMetrics, 'overall');
+        $metrics = QoeMetric::whereBetween('timestamp', [$start, $end])->get();
+        $prevMetrics = QoeMetric::whereBetween('timestamp', [$prevStart, $prevEnd])->get();
 
         $voiceScore = $this->avgScore($metrics, 'voice');
         $prevVoiceScore = $this->avgScore($prevMetrics, 'voice');
@@ -49,17 +45,21 @@ class ScoresHeaderWidget extends BaseWidget
         $dataScore = $this->avgScore($metrics, 'data');
         $prevDataScore = $this->avgScore($prevMetrics, 'data');
 
+        // Total Score = 40% Voice + 60% Data (standard weighting)
+        $totalScore = ($voiceScore * self::VOICE_WEIGHT) + ($dataScore * self::DATA_WEIGHT);
+        $prevTotalScore = ($prevVoiceScore * self::VOICE_WEIGHT) + ($prevDataScore * self::DATA_WEIGHT);
+
         return [
             $this->buildStat(
-                'Total Score',
-                number_format($overallScore, 1) . '%',
-                $overallScore,
-                $prevOverallScore,
+                '🏆 Total Score',
+                number_format($totalScore, 1) . '%',
+                $totalScore,
+                $prevTotalScore,
                 'heroicon-m-chart-bar-square',
                 fn($v) => $v >= 80 ? 'success' : ($v >= 60 ? 'warning' : 'danger'),
             ),
             $this->buildStat(
-                'Voice Score',
+                '📞 Voice Score (40%)',
                 number_format($voiceScore, 1) . '%',
                 $voiceScore,
                 $prevVoiceScore,
@@ -67,7 +67,7 @@ class ScoresHeaderWidget extends BaseWidget
                 fn($v) => $v >= 80 ? 'success' : ($v >= 60 ? 'warning' : 'danger'),
             ),
             $this->buildStat(
-                'Data Score',
+                '📊 Data Score (60%)',
                 number_format($dataScore, 1) . '%',
                 $dataScore,
                 $prevDataScore,
