@@ -362,6 +362,15 @@ class QoeMetricResource extends Resource
                                     return round(array_sum($arr) / count($arr), 2);
                                 };
 
+                                // Helper to convert array to comma-separated string
+                                $arrToStr = function ($arr) {
+                                    if (!is_array($arr) || count($arr) === 0)
+                                        return '';
+                                    return implode('; ', array_map(function ($v) {
+                                        return is_numeric($v) ? round($v, 2) : $v;
+                                    }, $arr));
+                                };
+
                                 fputcsv($file, [
                                     // Basic info
                                     'ID',
@@ -370,8 +379,10 @@ class QoeMetricResource extends Resource
                                     'Region',
                                     'Platform',
                                     'Model',
+                                    'Brand',
                                     'Operator',
                                     'Network Type',
+                                    'OS Version',
                                     // Location
                                     'Latitude',
                                     'Longitude',
@@ -393,45 +404,75 @@ class QoeMetricResource extends Resource
                                     'CDR (%)',
                                     'Avg Setup Time (ms)',
                                     'Avg MOS',
+                                    'Voice Setup Times (ms)',
+                                    'Voice MOS Samples',
+                                    'Call Disconnect Reasons',
                                     // Browsing
                                     'Browsing Requests',
                                     'Browsing Completed',
                                     'Avg Browsing Duration (ms)',
+                                    'Avg DNS Resolution (ms)',
                                     'Avg Browsing Throughput (Kbps)',
+                                    'Browsing Durations (ms)',
+                                    'DNS Resolution Times (ms)',
+                                    'Browsing Throughputs (Kbps)',
                                     // Streaming
                                     'Streaming Requests',
                                     'Streaming Completed',
                                     'Avg Streaming MOS',
+                                    'Avg Streaming Setup (ms)',
                                     'Avg Streaming Throughput (Kbps)',
+                                    'Avg Buffering Count',
+                                    'Streaming MOS Samples',
+                                    'Streaming Setup Times (ms)',
+                                    'Streaming Throughputs (Kbps)',
+                                    'Buffering Counts',
+                                    'Resolutions',
                                     // HTTP DL/UL
                                     'HTTP DL Requests',
                                     'HTTP DL Completed',
                                     'Avg DL Throughput (Mbps)',
+                                    'DL Throughputs (Mbps)',
                                     'HTTP UL Requests',
                                     'HTTP UL Completed',
                                     'Avg UL Throughput (Mbps)',
+                                    'UL Throughputs (Mbps)',
                                     // FTP DL/UL
                                     'FTP DL Requests',
                                     'FTP DL Completed',
                                     'Avg FTP DL Throughput (Mbps)',
+                                    'FTP DL Throughputs (Mbps)',
                                     'FTP UL Requests',
                                     'FTP UL Completed',
                                     'Avg FTP UL Throughput (Mbps)',
+                                    'FTP UL Throughputs (Mbps)',
                                     // Social
                                     'Social Requests',
                                     'Social Completed',
                                     'Avg Social Duration (ms)',
                                     'Avg Social Throughput (Kbps)',
+                                    'Social Durations (ms)',
+                                    'Social Throughputs (Kbps)',
                                     // Latency
                                     'Latency Requests',
                                     'Latency Completed',
                                     'Avg Latency Score',
+                                    'Latency Scores',
                                     // Signal
                                     'RSRP',
                                     'RSRQ',
+                                    'RSSNR',
+                                    'CQI',
                                     'PCI',
                                     'eNB',
                                     'Cell ID',
+                                    'TAC',
+                                    'ECI',
+                                    'Data State',
+                                    'Data Activity',
+                                    'Call State',
+                                    'SIM State',
+                                    'Is Roaming',
                                 ]);
 
                                 foreach ($records as $record) {
@@ -462,8 +503,10 @@ class QoeMetricResource extends Resource
                                         $record->region,
                                         $d['platform'] ?? 'N/A',
                                         $d['model'] ?? 'N/A',
+                                        $d['brand'] ?? 'N/A',
                                         $d['operator'] ?? 'N/A',
                                         $d['netType'] ?? 'N/A',
+                                        $d['Android_version'] ?? $d['osVersion'] ?? 'N/A',
                                         // Location
                                         $loc['latitude'] ?? '',
                                         $loc['longitude'] ?? '',
@@ -485,45 +528,79 @@ class QoeMetricResource extends Resource
                                         $cdr,
                                         is_numeric($avgSetup) ? round($avgSetup, 0) : '',
                                         $avgMos,
+                                        $arrToStr($voice['setupTimes'] ?? []),
+                                        $arrToStr($voice['mosSamples'] ?? []),
+                                        $arrToStr(array_map(function ($r) {
+                                            if (is_array($r))
+                                                return ($r['label'] ?? $r['code'] ?? '');
+                                            return $r;
+                                        }, $voice['reasons'] ?? [])),
                                         // Browsing
                                         $data['browsing']['requests'] ?? 0,
                                         $data['browsing']['completed'] ?? 0,
                                         $avg($data['browsing']['durations'] ?? []),
+                                        $avg($data['browsing']['dnsResolutionTimes'] ?? []),
                                         $avg($data['browsing']['throughputs'] ?? []),
+                                        $arrToStr($data['browsing']['durations'] ?? []),
+                                        $arrToStr($data['browsing']['dnsResolutionTimes'] ?? []),
+                                        $arrToStr($data['browsing']['throughputs'] ?? []),
                                         // Streaming
                                         $data['streaming']['requests'] ?? 0,
                                         $data['streaming']['completed'] ?? 0,
                                         $avg($data['streaming']['mosSamples'] ?? []),
+                                        $avg($data['streaming']['setupTimes'] ?? []),
                                         $avg($data['streaming']['throughputs'] ?? []),
+                                        $avg($data['streaming']['bufferingCounts'] ?? []),
+                                        $arrToStr($data['streaming']['mosSamples'] ?? []),
+                                        $arrToStr($data['streaming']['setupTimes'] ?? []),
+                                        $arrToStr($data['streaming']['throughputs'] ?? []),
+                                        $arrToStr($data['streaming']['bufferingCounts'] ?? []),
+                                        $arrToStr($data['streaming']['resolutions'] ?? []),
                                         // HTTP DL/UL
                                         $data['http']['dl']['requests'] ?? 0,
                                         $data['http']['dl']['completed'] ?? 0,
                                         $avg($data['http']['dl']['throughputs'] ?? []),
+                                        $arrToStr($data['http']['dl']['throughputs'] ?? []),
                                         $data['http']['ul']['requests'] ?? 0,
                                         $data['http']['ul']['completed'] ?? 0,
                                         $avg($data['http']['ul']['throughputs'] ?? []),
+                                        $arrToStr($data['http']['ul']['throughputs'] ?? []),
                                         // FTP DL/UL
                                         $data['ftp']['dl']['requests'] ?? 0,
                                         $data['ftp']['dl']['completed'] ?? 0,
                                         $avg($data['ftp']['dl']['throughputs'] ?? []),
+                                        $arrToStr($data['ftp']['dl']['throughputs'] ?? []),
                                         $data['ftp']['ul']['requests'] ?? 0,
                                         $data['ftp']['ul']['completed'] ?? 0,
                                         $avg($data['ftp']['ul']['throughputs'] ?? []),
+                                        $arrToStr($data['ftp']['ul']['throughputs'] ?? []),
                                         // Social
                                         $data['social']['requests'] ?? 0,
                                         $data['social']['completed'] ?? 0,
                                         $avg($data['social']['durations'] ?? []),
                                         $avg($data['social']['throughputs'] ?? []),
+                                        $arrToStr($data['social']['durations'] ?? []),
+                                        $arrToStr($data['social']['throughputs'] ?? []),
                                         // Latency
                                         $data['latency']['requests'] ?? 0,
                                         $data['latency']['completed'] ?? 0,
                                         $avg($data['latency']['scores'] ?? []),
+                                        $arrToStr($data['latency']['scores'] ?? []),
                                         // Signal
                                         $d['rsrp'] ?? '',
                                         $d['rsrq'] ?? '',
+                                        $d['rssnr'] ?? '',
+                                        $d['cqi'] ?? '',
                                         $d['pci'] ?? '',
                                         $d['enb'] ?? '',
                                         $d['cellId'] ?? '',
+                                        $d['tac'] ?? '',
+                                        $d['eci'] ?? '',
+                                        $d['dataState'] ?? '',
+                                        $d['dataActivity'] ?? '',
+                                        $d['callState'] ?? '',
+                                        $d['simState'] ?? '',
+                                        $d['isRoaming'] ?? '',
                                     ]);
                                 }
                                 fclose($file);
