@@ -147,9 +147,9 @@ class MetricsController extends Controller
     private function checkThresholds(QoeMetric $metric): void
     {
         $scores = $metric->scores ?? [];
-        $overallScore = $scores['overall']['score'] ?? null;
-        $voiceScore = $scores['voice']['score'] ?? null;
-        $dataScore = $scores['data']['score'] ?? null;
+        $overallScore = is_array($scores['overall'] ?? null) ? ($scores['overall']['score'] ?? null) : (is_numeric($scores['overall'] ?? null) ? $scores['overall'] : null);
+        $voiceScore = is_array($scores['voice'] ?? null) ? ($scores['voice']['score'] ?? null) : (is_numeric($scores['voice'] ?? null) ? $scores['voice'] : null);
+        $dataScore = is_array($scores['data'] ?? null) ? ($scores['data']['score'] ?? null) : (is_numeric($scores['data'] ?? null) ? $scores['data'] : null);
 
         // Threshold: Overall QoE < 60% is poor
         if ($overallScore !== null && $overallScore < 0.60) {

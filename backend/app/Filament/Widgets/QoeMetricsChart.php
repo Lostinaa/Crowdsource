@@ -49,15 +49,18 @@ class QoeMetricsChart extends ChartWidget
 
             // Overall QoE Scores (FRS Section 4.3)
             $overallScores[] = round($group->avg(function ($metric) {
-                return ($metric->scores['overall']['score'] ?? 0) * 100;
+                $val = $metric->scores['overall'] ?? 0;
+                return (is_array($val) ? ($val['score'] ?? 0) : (is_numeric($val) ? $val : 0)) * 100;
             }), 1);
 
             $voiceScores[] = round($group->avg(function ($metric) {
-                return ($metric->scores['voice']['score'] ?? 0) * 100;
+                $val = $metric->scores['voice'] ?? 0;
+                return (is_array($val) ? ($val['score'] ?? 0) : (is_numeric($val) ? $val : 0)) * 100;
             }), 1);
 
             $dataScores[] = round($group->avg(function ($metric) {
-                return ($metric->scores['data']['score'] ?? 0) * 100;
+                $val = $metric->scores['data'] ?? 0;
+                return (is_array($val) ? ($val['score'] ?? 0) : (is_numeric($val) ? $val : 0)) * 100;
             }), 1);
 
             // Voice KPIs (FRS Section 4.1)

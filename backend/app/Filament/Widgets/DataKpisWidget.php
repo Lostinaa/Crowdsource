@@ -71,7 +71,18 @@ class DataKpisWidget extends BaseWidget
     {
         if ($metrics->isEmpty())
             return 0;
-        return $metrics->avg(fn($m) => ($m->scores[$type]['score'] ?? 0) * 100);
+        return $metrics->avg(function ($m) use ($type) {
+            $val = $m->scores[$type] ?? null;
+            // Handle nested format: { score: 0.72 }
+            if (is_array($val) && isset($val['score'])) {
+                return ($val['score'] ?? 0) * 100;
+            }
+            // Handle flat format: 0.72
+            if (is_numeric($val)) {
+                return $val * 100;
+            }
+            return 0;
+        });
     }
 
     private function successRatio($metrics, string $path): float

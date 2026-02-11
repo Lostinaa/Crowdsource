@@ -362,9 +362,9 @@ class QoeMetricResource extends Resource
                                         $record->user?->email ?? 'Anonymous',
                                         $record->timestamp,
                                         $record->region,
-                                        ($record->scores['overall']['score'] ?? 0) * 100,
-                                        ($record->scores['voice']['score'] ?? 0) * 100,
-                                        ($record->scores['data']['score'] ?? 0) * 100,
+                                        (is_array($record->scores['overall'] ?? null) ? ($record->scores['overall']['score'] ?? 0) : (is_numeric($record->scores['overall'] ?? null) ? $record->scores['overall'] : 0)) * 100,
+                                        (is_array($record->scores['voice'] ?? null) ? ($record->scores['voice']['score'] ?? 0) : (is_numeric($record->scores['voice'] ?? null) ? $record->scores['voice'] : 0)) * 100,
+                                        (is_array($record->scores['data'] ?? null) ? ($record->scores['data']['score'] ?? 0) : (is_numeric($record->scores['data'] ?? null) ? $record->scores['data'] : 0)) * 100,
                                         $record->device_info['platform'] ?? 'N/A',
                                         $record->device_info['model'] ?? 'N/A',
                                     ]);

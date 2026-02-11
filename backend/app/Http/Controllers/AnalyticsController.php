@@ -16,7 +16,7 @@ class AnalyticsController extends Controller
     public function overview(Request $request): JsonResponse
     {
         AuditLogService::log('viewed', null, null, null, "Analytics overview accessed");
-        
+
         $query = QoeMetric::query();
 
         // Apply filters
@@ -41,20 +41,25 @@ class AnalyticsController extends Controller
                 'end' => $metrics->max('timestamp'),
             ],
             'average_scores' => [
-                'overall' => $metrics->avg(function($m) {
-                    return $m->scores['overall']['score'] ?? null;
+                'overall' => $metrics->avg(function ($m) {
+                    $v = $m->scores['overall'] ?? null;
+                    return is_array($v) ? ($v['score'] ?? null) : (is_numeric($v) ? $v : null);
                 }),
-                'voice' => $metrics->avg(function($m) {
-                    return $m->scores['voice']['score'] ?? null;
+                'voice' => $metrics->avg(function ($m) {
+                    $v = $m->scores['voice'] ?? null;
+                    return is_array($v) ? ($v['score'] ?? null) : (is_numeric($v) ? $v : null);
                 }),
-                'data' => $metrics->avg(function($m) {
-                    return $m->scores['data']['score'] ?? null;
+                'data' => $metrics->avg(function ($m) {
+                    $v = $m->scores['data'] ?? null;
+                    return is_array($v) ? ($v['score'] ?? null) : (is_numeric($v) ? $v : null);
                 }),
-                'browsing' => $metrics->avg(function($m) {
-                    return $m->scores['browsing']['score'] ?? null;
+                'browsing' => $metrics->avg(function ($m) {
+                    $v = $m->scores['browsing'] ?? null;
+                    return is_array($v) ? ($v['score'] ?? null) : (is_numeric($v) ? $v : null);
                 }),
-                'streaming' => $metrics->avg(function($m) {
-                    return $m->scores['streaming']['score'] ?? null;
+                'streaming' => $metrics->avg(function ($m) {
+                    $v = $m->scores['streaming'] ?? null;
+                    return is_array($v) ? ($v['score'] ?? null) : (is_numeric($v) ? $v : null);
                 }),
             ],
             'platform_distribution' => $this->getPlatformDistribution($metrics),
@@ -73,7 +78,7 @@ class AnalyticsController extends Controller
     public function voice(Request $request): JsonResponse
     {
         AuditLogService::log('viewed', null, null, null, "Voice analytics accessed");
-        
+
         $query = QoeMetric::query();
 
         if ($request->user()) {
@@ -82,23 +87,23 @@ class AnalyticsController extends Controller
 
         $metrics = $query->get();
 
-        $totalAttempts = $metrics->sum(function($m) {
+        $totalAttempts = $metrics->sum(function ($m) {
             return $m->metrics['voice']['attempts'] ?? 0;
         });
-        $totalCompleted = $metrics->sum(function($m) {
+        $totalCompleted = $metrics->sum(function ($m) {
             return $m->metrics['voice']['completed'] ?? 0;
         });
-        $totalDropped = $metrics->sum(function($m) {
+        $totalDropped = $metrics->sum(function ($m) {
             return $m->metrics['voice']['dropped'] ?? 0;
         });
-        $totalSetupOk = $metrics->sum(function($m) {
+        $totalSetupOk = $metrics->sum(function ($m) {
             return $m->metrics['voice']['setupOk'] ?? 0;
         });
 
         // Get all MOS samples and setup times for threshold calculations
         $allMosSamples = $this->getAllValuesFromNested($metrics, 'metrics.voice.mosSamples');
         $allSetupTimes = $this->getAllValuesFromNested($metrics, 'metrics.voice.setupTimes');
-        
+
         $voiceData = [
             'total_attempts' => $totalAttempts,
             'total_completed' => $totalCompleted,
@@ -109,8 +114,8 @@ class AnalyticsController extends Controller
             'cssr' => $totalAttempts > 0 ? ($totalSetupOk / $totalAttempts) * 100 : null, // Percentage
             'cdr' => ($totalCompleted + $totalDropped) > 0 ? ($totalDropped / ($totalCompleted + $totalDropped)) * 100 : null, // Percentage
             // Threshold-based metrics
-            'mos_under_1_6_percentage' => $allMosSamples->count() > 0 
-                ? ($allMosSamples->filter(fn($v) => $v < 1.6)->count() / $allMosSamples->count()) * 100 
+            'mos_under_1_6_percentage' => $allMosSamples->count() > 0
+                ? ($allMosSamples->filter(fn($v) => $v < 1.6)->count() / $allMosSamples->count()) * 100
                 : null,
             'setup_time_over_10s_percentage' => $allSetupTimes->count() > 0
                 ? ($allSetupTimes->filter(fn($v) => $v > 10000)->count() / $allSetupTimes->count()) * 100
@@ -129,7 +134,7 @@ class AnalyticsController extends Controller
     public function data(Request $request): JsonResponse
     {
         AuditLogService::log('viewed', null, null, null, "Data analytics accessed");
-        
+
         $query = QoeMetric::query();
 
         if ($request->user()) {
@@ -142,23 +147,23 @@ class AnalyticsController extends Controller
         $browsingRequests = $metrics->sum(fn($m) => $m->metrics['data']['browsing']['requests'] ?? 0);
         $browsingCompleted = $metrics->sum(fn($m) => $m->metrics['data']['browsing']['completed'] ?? 0);
         $browsingDurations = $this->getAllValuesFromNested($metrics, 'metrics.data.browsing.durations');
-        
+
         // Streaming analytics
         $streamingRequests = $metrics->sum(fn($m) => $m->metrics['data']['streaming']['requests'] ?? 0);
         $streamingCompleted = $metrics->sum(fn($m) => $m->metrics['data']['streaming']['completed'] ?? 0);
         $streamingMosSamples = $this->getAllValuesFromNested($metrics, 'metrics.data.streaming.mosSamples');
         $streamingSetupTimes = $this->getAllValuesFromNested($metrics, 'metrics.data.streaming.setupTimes');
-        
+
         // HTTP Download analytics
         $httpDlRequests = $metrics->sum(fn($m) => $m->metrics['data']['http']['dl']['requests'] ?? 0);
         $httpDlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['http']['dl']['completed'] ?? 0);
         $httpDlThroughputs = $this->getAllValuesFromNested($metrics, 'metrics.data.http.dl.throughputs');
-        
+
         // HTTP Upload analytics
         $httpUlRequests = $metrics->sum(fn($m) => $m->metrics['data']['http']['ul']['requests'] ?? 0);
         $httpUlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['http']['ul']['completed'] ?? 0);
         $httpUlThroughputs = $this->getAllValuesFromNested($metrics, 'metrics.data.http.ul.throughputs');
-        
+
         // FTP analytics
         $ftpDlRequests = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['dl']['requests'] ?? 0);
         $ftpDlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['dl']['completed'] ?? 0);
@@ -166,17 +171,17 @@ class AnalyticsController extends Controller
         $ftpUlRequests = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['ul']['requests'] ?? 0);
         $ftpUlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['ul']['completed'] ?? 0);
         $ftpUlThroughputs = $this->getAllValuesFromNested($metrics, 'metrics.data.ftp.ul.throughputs');
-        
+
         // Social analytics
         $socialRequests = $metrics->sum(fn($m) => $m->metrics['data']['social']['requests'] ?? 0);
         $socialCompleted = $metrics->sum(fn($m) => $m->metrics['data']['social']['completed'] ?? 0);
         $socialDurations = $this->getAllValuesFromNested($metrics, 'metrics.data.social.durations');
-        
+
         // Latency analytics
         $latencyRequests = $metrics->sum(fn($m) => $m->metrics['data']['latency']['requests'] ?? 0);
         $latencyCompleted = $metrics->sum(fn($m) => $m->metrics['data']['latency']['completed'] ?? 0);
         $latencyScores = $this->getAllValuesFromNested($metrics, 'metrics.data.latency.scores');
-        
+
         $dataAnalytics = [
             'browsing' => [
                 'total_requests' => $browsingRequests,
@@ -265,7 +270,7 @@ class AnalyticsController extends Controller
     public function trends(Request $request): JsonResponse
     {
         AuditLogService::log('viewed', null, null, null, "Analytics trends accessed");
-        
+
         $query = QoeMetric::query();
 
         if ($request->user()) {
@@ -275,7 +280,7 @@ class AnalyticsController extends Controller
         $groupBy = $request->input('group_by', 'day'); // day, week, month
 
         // Calculate trends properly by extracting JSON scores
-        $trends = $query->get()->groupBy(function($metric) use ($groupBy) {
+        $trends = $query->get()->groupBy(function ($metric) use ($groupBy) {
             $date = \Carbon\Carbon::parse($metric->timestamp);
             switch ($groupBy) {
                 case 'week':
@@ -285,15 +290,19 @@ class AnalyticsController extends Controller
                 default:
                     return $date->format('Y-m-d');
             }
-        })->map(function($group, $date) {
-            $scores = $group->map(function($m) {
+        })->map(function ($group, $date) {
+            $scores = $group->map(function ($m) {
+                $getScore = function ($type) use ($m) {
+                    $v = $m->scores[$type] ?? null;
+                    return is_array($v) ? ($v['score'] ?? null) : (is_numeric($v) ? $v : null);
+                };
                 return [
-                    'overall' => $m->scores['overall']['score'] ?? null,
-                    'voice' => $m->scores['voice']['score'] ?? null,
-                    'data' => $m->scores['data']['score'] ?? null,
+                    'overall' => $getScore('overall'),
+                    'voice' => $getScore('voice'),
+                    'data' => $getScore('data'),
                 ];
             })->filter(fn($s) => $s['overall'] !== null);
-            
+
             return [
                 'date' => $date,
                 'avg_overall' => $scores->avg('overall'),
@@ -320,7 +329,7 @@ class AnalyticsController extends Controller
     private function getRegionDistribution($metrics)
     {
         return $metrics->filter(fn($m) => $m->location)
-            ->groupBy(function($metric) {
+            ->groupBy(function ($metric) {
                 // Group by approximate region based on coordinates
                 // This is simplified - you'd want more sophisticated geocoding
                 return 'region_' . round($metric->location['latitude'] ?? 0, 1);
@@ -342,7 +351,7 @@ class AnalyticsController extends Controller
     {
         $parts = explode('.', $path);
         $values = collect();
-        
+
         foreach ($metrics as $metric) {
             $data = $metric->metrics;
             foreach ($parts as $part) {
@@ -353,14 +362,14 @@ class AnalyticsController extends Controller
                     break;
                 }
             }
-            
+
             if (is_array($data)) {
                 $values = $values->merge($data);
             } elseif ($data !== null) {
                 $values->push($data);
             }
         }
-        
+
         return $values->filter(fn($v) => $v !== null && $v !== '');
     }
 
@@ -372,16 +381,16 @@ class AnalyticsController extends Controller
         if ($values->count() === 0) {
             return null;
         }
-        
+
         $sorted = $values->sort()->values();
         $index = ($percentile / 100) * ($sorted->count() - 1);
         $lower = floor($index);
         $upper = ceil($index);
-        
+
         if ($lower === $upper) {
             return $sorted[$lower];
         }
-        
+
         $weight = $index - $lower;
         return $sorted[$lower] * (1 - $weight) + $sorted[$upper] * $weight;
     }

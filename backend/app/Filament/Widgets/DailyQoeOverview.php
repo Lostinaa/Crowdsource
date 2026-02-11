@@ -32,7 +32,16 @@ class DailyQoeOverview extends BaseWidget
 
         // Data KPIs
         $avgOverallScore = $metrics->avg(function ($metric) {
-            return ($metric->scores['overall']['score'] ?? 0) * 100;
+            $val = $metric->scores['overall'] ?? null;
+            // Handle nested format: { score: 0.72 }
+            if (is_array($val) && isset($val['score'])) {
+                return ($val['score'] ?? 0) * 100;
+            }
+            // Handle flat format: 0.72
+            if (is_numeric($val)) {
+                return $val * 100;
+            }
+            return 0;
         });
 
         return [
