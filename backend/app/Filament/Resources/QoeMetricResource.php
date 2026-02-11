@@ -344,29 +344,186 @@ class QoeMetricResource extends Resource
 
                             $callback = function () use ($records) {
                                 $file = fopen('php://output', 'w');
+
+                                // Helper to safely read scores (flat or nested)
+                                $getScore = function ($scores, $type) {
+                                    $v = $scores[$type] ?? null;
+                                    if (is_array($v) && isset($v['score']))
+                                        return ($v['score'] ?? 0) * 100;
+                                    if (is_numeric($v))
+                                        return $v * 100;
+                                    return 0;
+                                };
+
+                                // Helper to get avg from array
+                                $avg = function ($arr) {
+                                    if (!is_array($arr) || count($arr) === 0)
+                                        return '';
+                                    return round(array_sum($arr) / count($arr), 2);
+                                };
+
                                 fputcsv($file, [
+                                    // Basic info
                                     'ID',
                                     'Email',
                                     'Timestamp',
                                     'Region',
-                                    'Overall Score',
-                                    'Voice Score',
-                                    'Data Score',
                                     'Platform',
-                                    'Model'
+                                    'Model',
+                                    'Operator',
+                                    'Network Type',
+                                    // Location
+                                    'Latitude',
+                                    'Longitude',
+                                    // Scores
+                                    'Overall Score (%)',
+                                    'Voice Score (%)',
+                                    'Data Score (%)',
+                                    'Browsing Score (%)',
+                                    'Streaming Score (%)',
+                                    'HTTP Score (%)',
+                                    'Social Score (%)',
+                                    'Latency Score (%)',
+                                    // Voice KPIs
+                                    'Voice Attempts',
+                                    'Voice Setup OK',
+                                    'Voice Completed',
+                                    'Voice Dropped',
+                                    'CSSR (%)',
+                                    'CDR (%)',
+                                    'Avg Setup Time (ms)',
+                                    'Avg MOS',
+                                    // Browsing
+                                    'Browsing Requests',
+                                    'Browsing Completed',
+                                    'Avg Browsing Duration (ms)',
+                                    'Avg Browsing Throughput (Kbps)',
+                                    // Streaming
+                                    'Streaming Requests',
+                                    'Streaming Completed',
+                                    'Avg Streaming MOS',
+                                    'Avg Streaming Throughput (Kbps)',
+                                    // HTTP DL/UL
+                                    'HTTP DL Requests',
+                                    'HTTP DL Completed',
+                                    'Avg DL Throughput (Mbps)',
+                                    'HTTP UL Requests',
+                                    'HTTP UL Completed',
+                                    'Avg UL Throughput (Mbps)',
+                                    // FTP DL/UL
+                                    'FTP DL Requests',
+                                    'FTP DL Completed',
+                                    'Avg FTP DL Throughput (Mbps)',
+                                    'FTP UL Requests',
+                                    'FTP UL Completed',
+                                    'Avg FTP UL Throughput (Mbps)',
+                                    // Social
+                                    'Social Requests',
+                                    'Social Completed',
+                                    'Avg Social Duration (ms)',
+                                    'Avg Social Throughput (Kbps)',
+                                    // Latency
+                                    'Latency Requests',
+                                    'Latency Completed',
+                                    'Avg Latency Score',
+                                    // Signal
+                                    'RSRP',
+                                    'RSRQ',
+                                    'PCI',
+                                    'eNB',
+                                    'Cell ID',
                                 ]);
 
                                 foreach ($records as $record) {
+                                    $m = $record->metrics ?? [];
+                                    $s = $record->scores ?? [];
+                                    $d = $record->device_info ?? [];
+                                    $loc = $record->location ?? [];
+                                    $voice = $m['voice'] ?? [];
+                                    $data = $m['data'] ?? [];
+
+                                    // Voice calculations
+                                    $attempts = $voice['attempts'] ?? 0;
+                                    $setupOk = $voice['setupOk'] ?? 0;
+                                    $completed = $voice['completed'] ?? 0;
+                                    $dropped = $voice['dropped'] ?? 0;
+                                    $cssr = $attempts > 0 ? round(($setupOk / $attempts) * 100, 1) : '';
+                                    $cdr = ($completed + $dropped) > 0 ? round(($dropped / ($completed + $dropped)) * 100, 1) : '';
+                                    $setupTimes = $voice['setupTimes'] ?? [];
+                                    $avgSetup = $voice['avgSetupTimeMs'] ?? $avg($setupTimes);
+                                    $mosSamples = $voice['mosSamples'] ?? [];
+                                    $avgMos = $avg($mosSamples);
+
                                     fputcsv($file, [
+                                        // Basic info
                                         $record->id,
                                         $record->user?->email ?? 'Anonymous',
                                         $record->timestamp,
                                         $record->region,
-                                        (is_array($record->scores['overall'] ?? null) ? ($record->scores['overall']['score'] ?? 0) : (is_numeric($record->scores['overall'] ?? null) ? $record->scores['overall'] : 0)) * 100,
-                                        (is_array($record->scores['voice'] ?? null) ? ($record->scores['voice']['score'] ?? 0) : (is_numeric($record->scores['voice'] ?? null) ? $record->scores['voice'] : 0)) * 100,
-                                        (is_array($record->scores['data'] ?? null) ? ($record->scores['data']['score'] ?? 0) : (is_numeric($record->scores['data'] ?? null) ? $record->scores['data'] : 0)) * 100,
-                                        $record->device_info['platform'] ?? 'N/A',
-                                        $record->device_info['model'] ?? 'N/A',
+                                        $d['platform'] ?? 'N/A',
+                                        $d['model'] ?? 'N/A',
+                                        $d['operator'] ?? 'N/A',
+                                        $d['netType'] ?? 'N/A',
+                                        // Location
+                                        $loc['latitude'] ?? '',
+                                        $loc['longitude'] ?? '',
+                                        // Scores
+                                        $getScore($s, 'overall'),
+                                        $getScore($s, 'voice'),
+                                        $getScore($s, 'data'),
+                                        $getScore($s, 'browsing'),
+                                        $getScore($s, 'streaming'),
+                                        $getScore($s, 'http'),
+                                        $getScore($s, 'social'),
+                                        $getScore($s, 'latency'),
+                                        // Voice KPIs
+                                        $attempts,
+                                        $setupOk,
+                                        $completed,
+                                        $dropped,
+                                        $cssr,
+                                        $cdr,
+                                        is_numeric($avgSetup) ? round($avgSetup, 0) : '',
+                                        $avgMos,
+                                        // Browsing
+                                        $data['browsing']['requests'] ?? 0,
+                                        $data['browsing']['completed'] ?? 0,
+                                        $avg($data['browsing']['durations'] ?? []),
+                                        $avg($data['browsing']['throughputs'] ?? []),
+                                        // Streaming
+                                        $data['streaming']['requests'] ?? 0,
+                                        $data['streaming']['completed'] ?? 0,
+                                        $avg($data['streaming']['mosSamples'] ?? []),
+                                        $avg($data['streaming']['throughputs'] ?? []),
+                                        // HTTP DL/UL
+                                        $data['http']['dl']['requests'] ?? 0,
+                                        $data['http']['dl']['completed'] ?? 0,
+                                        $avg($data['http']['dl']['throughputs'] ?? []),
+                                        $data['http']['ul']['requests'] ?? 0,
+                                        $data['http']['ul']['completed'] ?? 0,
+                                        $avg($data['http']['ul']['throughputs'] ?? []),
+                                        // FTP DL/UL
+                                        $data['ftp']['dl']['requests'] ?? 0,
+                                        $data['ftp']['dl']['completed'] ?? 0,
+                                        $avg($data['ftp']['dl']['throughputs'] ?? []),
+                                        $data['ftp']['ul']['requests'] ?? 0,
+                                        $data['ftp']['ul']['completed'] ?? 0,
+                                        $avg($data['ftp']['ul']['throughputs'] ?? []),
+                                        // Social
+                                        $data['social']['requests'] ?? 0,
+                                        $data['social']['completed'] ?? 0,
+                                        $avg($data['social']['durations'] ?? []),
+                                        $avg($data['social']['throughputs'] ?? []),
+                                        // Latency
+                                        $data['latency']['requests'] ?? 0,
+                                        $data['latency']['completed'] ?? 0,
+                                        $avg($data['latency']['scores'] ?? []),
+                                        // Signal
+                                        $d['rsrp'] ?? '',
+                                        $d['rsrq'] ?? '',
+                                        $d['pci'] ?? '',
+                                        $d['enb'] ?? '',
+                                        $d['cellId'] ?? '',
                                     ]);
                                 }
                                 fclose($file);

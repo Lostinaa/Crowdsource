@@ -145,7 +145,7 @@ class BackendApiClient {
             },
             ul: {
               requests: metrics.data?.http?.ul?.requests || 0,
-              completed: metrics.data?.http?.ul?.completed || 0,
+              completed: metrics.data?.http?.ul?.completed || 0,  
               throughputs: metrics.data?.http?.ul?.throughputs || [],
             },
           },
