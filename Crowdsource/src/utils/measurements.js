@@ -198,3 +198,65 @@ export const runHttpUploadTest = async ({ addHttpSample, silent = false }) => {
         return { success: false, error: error.message };
     }
 };
+
+export const runSocialTest = async ({ addSocialSample, silent = false }) => {
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) return { success: false, error: 'No Internet' };
+
+    const startTime = Date.now();
+    addSocialSample({ request: true });
+
+    try {
+        const testUrls = [
+            'https://www.facebook.com',
+            'https://m.facebook.com',
+            'https://jsonplaceholder.typicode.com/posts/1',
+        ];
+
+        let response = null;
+        let requestStart = null;
+
+        for (const url of testUrls) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+                requestStart = Date.now();
+                response = await fetch(url, { method: 'GET', cache: 'no-cache', signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (response.ok) break;
+            } catch (e) {
+                response = null;
+                requestStart = null;
+                continue;
+            }
+        }
+
+        if (!response || !response.ok) throw new Error('All social media URLs failed');
+
+        const contentType = response.headers.get('content-type') || '';
+        let responseData;
+        if (contentType.includes('application/json')) {
+            responseData = await response.json();
+        } else {
+            responseData = await response.text();
+        }
+
+        const duration = Date.now() - startTime;
+        const requestTime = requestStart ? Date.now() - requestStart : duration;
+        const responseSize = typeof responseData === 'string'
+            ? responseData.length
+            : JSON.stringify(responseData).length;
+        const throughputKbps = requestTime > 0 ? (responseSize * 8) / requestTime : 0;
+
+        addSocialSample({
+            completed: true,
+            durationMs: duration,
+            throughputKbps: throughputKbps,
+        });
+
+        return { success: true, duration, throughputKbps };
+    } catch (error) {
+        console.error('[Measurements] Social test error:', error);
+        return { success: false, error: error.message };
+    }
+};

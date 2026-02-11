@@ -116,6 +116,9 @@ class BackendApiClient {
           setupTimes: metrics.voice?.setupTimes || [],
           mosSamples: metrics.voice?.mosSamples || [],
           reasons: metrics.voice?.reasons || [],
+          avgSetupTimeMs: (metrics.voice?.setupTimes?.length > 0
+            ? metrics.voice.setupTimes.reduce((a, b) => a + b, 0) / metrics.voice.setupTimes.length
+            : 0),
         },
         data: {
           browsing: {
@@ -172,13 +175,14 @@ class BackendApiClient {
         },
       },
       scores: {
-        overall: scores.overall?.score || null,
-        voice: scores.voice?.score || null,
-        data: scores.data?.score || null,
-        browsing: scores.browsing?.score || null,
-        streaming: scores.streaming?.score || null,
-        http: scores.http?.score || null,
-        social: scores.social?.score || null,
+        overall: { score: scores.overall?.score ?? null },
+        voice: { score: scores.voice?.score ?? null },
+        data: { score: scores.data?.score ?? null },
+        browsing: { score: scores.browsing?.score ?? null },
+        streaming: { score: scores.streaming?.score ?? null },
+        http: { score: scores.http?.score ?? null },
+        social: { score: scores.social?.score ?? null },
+        latency: { score: scores.latency?.score ?? null },
       },
     };
 

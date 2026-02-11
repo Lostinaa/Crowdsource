@@ -503,6 +503,7 @@ export const QoEProvider = ({ children }) => {
         { label: 'Testing Streaming...', fn: Measurements.runStreamingTest },
         { label: 'Measuring Download...', fn: Measurements.runHttpDownloadTest },
         { label: 'Measuring Upload...', fn: Measurements.runHttpUploadTest },
+        { label: 'Testing Social Media...', fn: Measurements.runSocialTest },
       ];
 
       for (let i = 0; i < tests.length; i++) {
@@ -513,6 +514,7 @@ export const QoEProvider = ({ children }) => {
           addStreamingSample,
           addLatencySample,
           addHttpSample,
+          addSocialSample,
           silent: true
         });
         setTestProgress((i + 1) / tests.length);
@@ -535,7 +537,8 @@ export const QoEProvider = ({ children }) => {
     addBrowsingSample,
     addStreamingSample,
     addLatencySample,
-    addHttpSample
+    addHttpSample,
+    addSocialSample
   ]);
 
   const value = useMemo(

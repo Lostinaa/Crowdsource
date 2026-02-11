@@ -137,9 +137,17 @@ class QoeMetricsOverview extends BaseWidget
     {
         $times = [];
         foreach ($metrics as $m) {
+            // First try pre-computed avgSetupTimeMs
             $t = $m->metrics['voice']['avgSetupTimeMs'] ?? null;
-            if ($t !== null && $t > 0)
+            if ($t !== null && $t > 0) {
                 $times[] = $t;
+            } else {
+                // Fallback: compute from setupTimes array
+                $setupTimes = $m->metrics['voice']['setupTimes'] ?? [];
+                if (is_array($setupTimes) && count($setupTimes) > 0) {
+                    $times[] = array_sum($setupTimes) / count($setupTimes);
+                }
+            }
         }
         return count($times) > 0 ? array_sum($times) / count($times) : 0;
     }
