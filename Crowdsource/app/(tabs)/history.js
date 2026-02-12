@@ -63,17 +63,6 @@ export default function HistoryScreen() {
       >
         <View style={styles.historyItemHeader}>
           <Text style={styles.historyItemTime}>{formatTime(item.timestamp)}</Text>
-          <Text style={styles.historyItemScore}>
-            Overall: {formatScore(item.scores.overall?.score)}
-          </Text>
-        </View>
-        <View style={styles.historyItemMetrics}>
-          <Text style={styles.historyItemMetric}>
-            Voice: {formatScore(item.scores.voice?.score)}
-          </Text>
-          <Text style={styles.historyItemMetric}>
-            Data: {formatScore(item.scores.data?.score)}
-          </Text>
         </View>
       </TouchableOpacity>
     );
@@ -208,26 +197,9 @@ export default function HistoryScreen() {
         </View>
 
         {/* Current Metrics Summary */}
+        {/* Current Metrics Summary - Simplified to just Save Snapshot button as requested */}
         <View style={styles.currentSummary}>
-          <Text style={styles.currentSummaryTitle}>Current Metrics</Text>
-          <View style={styles.currentSummaryRow}>
-            <Text style={styles.currentSummaryLabel}>Overall:</Text>
-            <Text style={styles.currentSummaryValue}>
-              {formatScore(scores.overall?.score)}
-            </Text>
-          </View>
-          <View style={styles.currentSummaryRow}>
-            <Text style={styles.currentSummaryLabel}>Voice:</Text>
-            <Text style={styles.currentSummaryValue}>
-              {formatScore(scores.voice?.score)}
-            </Text>
-          </View>
-          <View style={styles.currentSummaryRow}>
-            <Text style={styles.currentSummaryLabel}>Data:</Text>
-            <Text style={styles.currentSummaryValue}>
-              {formatScore(scores.data?.score)}
-            </Text>
-          </View>
+          <Text style={styles.currentSummaryTitle}>Actions</Text>
           <TouchableOpacity style={styles.saveButton} onPress={handleSaveSnapshot}>
             <Text style={styles.saveButtonText}>Save Snapshot</Text>
           </TouchableOpacity>

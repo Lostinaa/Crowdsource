@@ -59,7 +59,8 @@ class ScoresHeaderWidget extends BaseWidget
                 $prevTotalScore,
                 'heroicon-m-chart-bar-square',
                 fn($v) => $v >= 80 ? 'success' : ($v >= 60 ? 'warning' : 'danger'),
-            ),
+            )->extraAttributes(['class' => 'font-black text-3xl']),
+
             $this->buildStat(
                 '📞 Voice Score (40%)',
                 number_format($voiceScore, 1) . '%',
@@ -67,7 +68,8 @@ class ScoresHeaderWidget extends BaseWidget
                 $prevVoiceScore,
                 'heroicon-m-phone',
                 fn($v) => $v >= 80 ? 'success' : ($v >= 60 ? 'warning' : 'danger'),
-            ),
+            )->extraAttributes(['class' => 'font-bold']),
+
             $this->buildStat(
                 '📊 Data Score (60%)',
                 number_format($dataScore, 1) . '%',
@@ -75,7 +77,7 @@ class ScoresHeaderWidget extends BaseWidget
                 $prevDataScore,
                 'heroicon-m-globe-alt',
                 fn($v) => $v >= 80 ? 'success' : ($v >= 60 ? 'warning' : 'danger'),
-            ),
+            )->extraAttributes(['class' => 'font-bold']),
         ];
     }
 
@@ -106,15 +108,21 @@ class ScoresHeaderWidget extends BaseWidget
         $stat = Stat::make($label, $displayValue)
             ->color($colorFn($current));
 
-        if ($previous > 0 && $current > 0) {
-            $change = (($current - $previous) / $previous) * 100;
-            $isPositive = $change >= 0;
-            $arrow = $change >= 0 ? '↑' : '↓';
-            $changeText = $arrow . ' ' . number_format(abs($change), 1) . '% vs previous';
+        if ($current > 0) {
+            if ($previous > 0) {
+                $change = (($current - $previous) / $previous) * 100;
+                $isPositive = $change >= 0;
+                $arrow = $change >= 0 ? '↑' : '↓';
+                $changeText = $arrow . ' ' . number_format(abs($change), 1) . '% vs previous';
 
-            $stat->description($changeText)
-                ->descriptionIcon($isPositive ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
-                ->color($isPositive ? 'success' : 'danger');
+                $stat->description($changeText)
+                    ->descriptionIcon($isPositive ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
+                    ->color($isPositive ? 'success' : 'danger');
+            } elseif ($previous == 0) {
+                $stat->description('↑ 100% vs previous')
+                    ->descriptionIcon('heroicon-m-arrow-trending-up')
+                    ->color('success');
+            }
         } else {
             $stat->descriptionIcon($icon);
         }

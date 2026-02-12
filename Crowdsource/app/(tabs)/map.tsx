@@ -319,14 +319,51 @@ export default function MapScreen() {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Coverage Map" />
-      {/* Compact info bar above map */}
-      <View style={styles.compactInfoBar}>
-        <Text style={styles.compactInfoText}>📍 {currentRegion}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={[styles.networkIndicator, { backgroundColor: networkColor }]} />
-          <Text style={styles.compactInfoText}>{diagnostics?.netType || networkCategory}</Text>
-        </View>
-        <Text style={styles.compactInfoText}>RSRP: {diagnostics?.rsrp ? `${diagnostics.rsrp} dBm` : 'N/A'}</Text>
+
+      {/* Network Info Cards (Moved from Network Tab) */}
+      <View style={styles.cardsContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsScrollContent}>
+          {/* Signal Quality Card */}
+          <View style={styles.infoCard}>
+            <Text style={styles.cardTitle}>Signal Quality</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>RSRP</Text>
+              <Text style={styles.infoValue}>{diagnostics?.rsrp ? `${diagnostics.rsrp} dBm` : 'N/A'}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>RSRQ</Text>
+              <Text style={styles.infoValue}>{diagnostics?.rsrq ? `${diagnostics.rsrq} dB` : 'N/A'}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>SINR</Text>
+              <Text style={styles.infoValue}>{diagnostics?.rssnr ? `${diagnostics.rssnr} dB` : 'N/A'}</Text>
+            </View>
+          </View>
+
+          {/* Serving Cell Card */}
+          <View style={styles.infoCard}>
+            <Text style={styles.cardTitle}>Serving Cell</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>eNB / Cell ID</Text>
+              <Text style={styles.infoValue}>
+                {diagnostics?.enb || 'N/A'} / {diagnostics?.cellId || 'N/A'}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>PCI / TAC</Text>
+              <Text style={styles.infoValue}>
+                {diagnostics?.pci || 'N/A'} / {diagnostics?.tac || 'N/A'}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Network</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={[styles.networkIndicator, { backgroundColor: networkColor }]} />
+                <Text style={styles.infoValue}>{diagnostics?.netType || networkCategory}</Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
       </View>
 
       {/* Map View */}
@@ -463,76 +500,76 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background.secondary,
   },
-  compactInfoBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
+  cardsContainer: {
     paddingVertical: theme.spacing.sm,
-    backgroundColor: theme.colors.background.card,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.light,
   },
-  compactInfoText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
+  cardsScrollContent: {
+    paddingHorizontal: theme.spacing.md,
+    gap: theme.spacing.md,
   },
-  infoBox: {
+  infoCard: {
     backgroundColor: theme.colors.background.card,
     borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.sm + 4,
-    marginBottom: theme.spacing.sm,
+    padding: theme.spacing.md,
+    width: 280,
     borderWidth: 1,
     borderColor: theme.colors.border.light,
     ...theme.shadows.sm,
   },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
-  },
-  infoLabel: {
-    color: theme.colors.text.secondary,
-    fontSize: 12,
-  },
-  infoValue: {
-    color: theme.colors.primary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  infoSubtext: {
-    color: theme.colors.text.secondary,
-    fontSize: 11,
-    marginTop: 4,
-  },
-  networkIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: theme.spacing.xs,
-  },
-  legendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: 6,
   },
-  legendColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginRight: theme.spacing.xs,
-  },
-  legendText: {
-    color: theme.colors.text.primary,
+  infoLabel: {
     fontSize: 12,
+    color: theme.colors.text.secondary,
+  },
+  infoValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+  },
+  networkIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 6,
+  },
+  mapContainer: {
+    flex: 1,
+    marginHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  map: {
+    flex: 1,
+  },
+  mapPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background.card,
+    padding: theme.spacing.lg,
+  },
+  placeholderText: {
+    color: theme.colors.text.secondary,
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: theme.spacing.sm,
+    lineHeight: 20,
   },
   legendBar: {
     flexDirection: 'row',
@@ -555,52 +592,6 @@ const styles = StyleSheet.create({
   legendLabel: {
     color: theme.colors.text.secondary,
     fontSize: 12,
-  },
-  mapContainer: {
-    flex: 1,
-    marginHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    borderRadius: theme.borderRadius.lg,
-    overflow: 'hidden',
-  },
-  map: {
-    flex: 1,
-  },
-  mapPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background.card,
-    padding: theme.spacing.lg,
-  },
-  placeholderTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: theme.spacing.md,
-    textAlign: 'center',
-  },
-  placeholderText: {
-    color: theme.colors.text.secondary,
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: theme.spacing.sm,
-    lineHeight: 20,
-  },
-  errorOverlay: {
-    position: 'absolute',
-    bottom: theme.spacing.md,
-    left: theme.spacing.md,
-    right: theme.spacing.md,
-    backgroundColor: theme.colors.danger + 'DD',
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.md,
-    ...theme.shadows.md,
-  },
-  errorText: {
-    color: theme.colors.white,
-    fontSize: 12,
-    textAlign: 'center',
   },
 });
 

@@ -165,17 +165,27 @@ class DataKpisWidget extends BaseWidget
     ): Stat {
         $stat = Stat::make($label, $displayValue)->color($colorFn($current));
 
-        if ($previous > 0 && $current > 0) {
-            $change = (($current - $previous) / $previous) * 100;
-            $arrow = $change >= 0 ? '↑' : '↓';
-            $isPositive = $change >= 0;
-            $changeText = $arrow . ' ' . number_format(abs($change), 1) . '% vs prev';
-            if ($subtitle)
-                $changeText .= ' · ' . $subtitle;
+        if ($current > 0) {
+            if ($previous > 0) {
+                $change = (($current - $previous) / $previous) * 100;
+                $arrow = $change >= 0 ? '↑' : '↓';
+                $isPositive = $change >= 0;
+                $changeText = $arrow . ' ' . number_format(abs($change), 1) . '% vs prev';
+                if ($subtitle)
+                    $changeText .= ' · ' . $subtitle;
 
-            $stat->description($changeText)
-                ->descriptionIcon($isPositive ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
-                ->color($isPositive ? 'success' : 'danger');
+                $stat->description($changeText)
+                    ->descriptionIcon($isPositive ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
+                    ->color($isPositive ? 'success' : 'danger');
+            } elseif ($previous == 0) {
+                $changeText = '↑ 100% vs prev';
+                if ($subtitle)
+                    $changeText .= ' · ' . $subtitle;
+
+                $stat->description($changeText)
+                    ->descriptionIcon('heroicon-m-arrow-trending-up')
+                    ->color('success');
+            }
         } else {
             $desc = $subtitle ?: '';
             if ($desc)

@@ -166,15 +166,22 @@ class QoeMetricsOverview extends BaseWidget
         $stat = Stat::make($label, $displayValue)
             ->color($colorFn($current));
 
-        if ($previous > 0 && $current > 0) {
-            $change = (($current - $previous) / $previous) * 100;
-            $isPositive = $invertComparison ? $change <= 0 : $change >= 0;
-            $arrow = $change >= 0 ? '↑' : '↓';
-            $changeText = $arrow . ' ' . number_format(abs($change), 1) . '% vs previous';
+        if ($current > 0) {
+            if ($previous > 0) {
+                $change = (($current - $previous) / $previous) * 100;
+                $isPositive = $invertComparison ? $change <= 0 : $change >= 0;
+                $arrow = $change >= 0 ? '↑' : '↓';
+                $changeText = $arrow . ' ' . number_format(abs($change), 1) . '% vs previous';
 
-            $stat->description($changeText)
-                ->descriptionIcon($isPositive ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
-                ->color($isPositive ? 'success' : 'danger');
+                $stat->description($changeText)
+                    ->descriptionIcon($isPositive ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
+                    ->color($isPositive ? 'success' : 'danger');
+            } elseif ($previous == 0) {
+                $isPositive = !$invertComparison; // 100% increase is good unless invertComparison is true (e.g. drop rate)
+                $stat->description('↑ 100% vs previous')
+                    ->descriptionIcon($isPositive ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
+                    ->color($isPositive ? 'success' : 'danger');
+            }
         } else {
             $stat->descriptionIcon($icon);
         }
