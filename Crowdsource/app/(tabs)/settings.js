@@ -163,20 +163,8 @@ export default function SettingsScreen() {
     }
   }, [isSyncing]);
 
-  // Auto-sync: stable interval that doesn't restart on metric changes
-  useEffect(() => {
-    if (!autoSync) return;
-
-    // Initial sync after 10 seconds
-    const timeout = setTimeout(syncToBackend, 10000);
-    // Then every 5 minutes
-    const interval = setInterval(syncToBackend, 300000);
-
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
-  }, [autoSync, syncToBackend]);
+  // Auto-sync is now handled globally by GlobalAutoSync component in _layout.js
+  // Manual sync button below still works via syncToBackend
 
   const SettingItem = ({ title, description, onPress, rightComponent, danger = false }) => (
     <TouchableOpacity

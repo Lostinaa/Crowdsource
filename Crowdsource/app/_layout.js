@@ -6,6 +6,7 @@ import { QoEProvider } from '../src/context/QoEContext';
 import { DrawerProvider } from '../src/context/DrawerContext';
 import Drawer from '../src/components/Drawer';
 import { pushNotificationService } from '../src/services/notificationService';
+import GlobalAutoSync from '../src/components/GlobalAutoSync';
 
 const PUSH_ENABLED_KEY = '@push_notifications_enabled';
 
@@ -101,6 +102,7 @@ export default function RootLayout() {
 
   return (
     <QoEProvider>
+      <GlobalAutoSync />
       <DrawerProvider>
         <Drawer />
         <Stack screenOptions={{ headerShown: false }}>
