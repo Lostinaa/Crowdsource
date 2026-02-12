@@ -14,6 +14,8 @@ class ScoresHeaderWidget extends BaseWidget
 
     protected static ?int $sort = -10;
 
+    protected static string $view = 'filament.widgets.scores-header-widget';
+
     protected int|string|array $columnSpan = 'full';
 
     protected ?string $heading = 'Overall QoE Scores';

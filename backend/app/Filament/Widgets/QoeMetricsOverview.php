@@ -14,6 +14,8 @@ class QoeMetricsOverview extends BaseWidget
 
     protected static ?int $sort = 1;
 
+    protected ?string $heading = 'Voice KPIs & Reports';
+
     protected function getStats(): array
     {
         $startDate = $this->filters['startDate'] ?? Carbon::today()->toDateString();

@@ -244,25 +244,22 @@ class QoeMetricResource extends Resource
 
                 Tables\Columns\TextColumn::make('scores.overall.score')
                     ->label('Overall Score')
-                    ->numeric(decimalPlaces: 1)
-                    ->suffix('%')
+                    ->formatStateUsing(fn($state) => number_format((float) $state * 100, 1) . '%')
                     ->sortable()
                     ->color(fn($state): string => match (true) {
-                        $state >= 80 => 'success',
-                        $state >= 60 => 'warning',
+                        $state >= 0.80 => 'success',
+                        $state >= 0.60 => 'warning',
                         default => 'danger',
                     }),
 
                 Tables\Columns\TextColumn::make('scores.voice.score')
                     ->label('Voice Score')
-                    ->numeric(decimalPlaces: 1)
-                    ->suffix('%')
+                    ->formatStateUsing(fn($state) => number_format((float) $state * 100, 1) . '%')
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('scores.data.score')
                     ->label('Data Score')
-                    ->numeric(decimalPlaces: 1)
-                    ->suffix('%')
+                    ->formatStateUsing(fn($state) => number_format((float) $state * 100, 1) . '%')
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('location.latitude')
