@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "tele Crowdsource",
-    "slug": "cs-qoe",
+    "name": "teleCrowd",
+    "slug": "crowdsource",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
