@@ -29,6 +29,14 @@ export default function VoiceScreen() {
   const callSetupStartTimeRef = useRef(null);
   const mosIntervalRef = useRef(null);
 
+  // Enhanced drop detection: deferred classification context
+  const pendingCallRef = useRef<{
+    callDuration: number;
+    rsrp: number | null;
+    timestamp: number;
+  } | null>(null);
+  const classifyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // ... (debug logging effects)
 
   const stopMosPolling = () => {
@@ -88,50 +96,159 @@ export default function VoiceScreen() {
     return value.toFixed(2);
   };
 
-  // Call Metrics listener
+  // ── Enhanced Call Drop Detection ──────────────────────────────────────
+  // Combines signal strength + call duration + CallLog metadata
+  // instead of just a 3-second time threshold.
+
+  const classifyCall = (
+    pending: { callDuration: number; rsrp: number | null },
+    disconnect?: { causeLabel?: string; duration?: number }
+  ) => {
+    const { callDuration, rsrp } = pending;
+    const causeLabel = disconnect?.causeLabel || null;
+    const source = disconnect ? 'calllog' : 'timeout';
+
+    let dropped = false;
+    let completed = false;
+    let rule = '';
+
+    // Priority 1: Explicit CallLog labels
+    if (causeLabel === 'OUTGOING_FAILED') {
+      dropped = true;
+      rule = 'OUTGOING_FAILED (call never connected)';
+    } else if (causeLabel === 'MISSED') {
+      // Setup failure, not a drop — don't count as either
+      rule = 'MISSED (setup failure, ignored)';
+    } else if (causeLabel === 'INCOMING_REJECTED') {
+      // User chose to reject — not a drop
+      rule = 'INCOMING_REJECTED (user action, ignored)';
+    }
+    // Priority 2: Signal + duration heuristics
+    else if (callDuration < 1000) {
+      dropped = true;
+      rule = `Sub-1s call (${callDuration}ms) — almost certainly network failure`;
+    } else if (callDuration < 5000 && rsrp !== null && rsrp < -110) {
+      dropped = true;
+      rule = `Short call (${callDuration}ms) + weak signal (${rsrp} dBm)`;
+    }
+    // Priority 3: Normal termination
+    else if (causeLabel === 'NORMAL' && callDuration >= 1000) {
+      completed = true;
+      rule = `NORMAL termination, duration ${callDuration}ms`;
+    }
+    // Priority 4: Timeout fallbacks (no disconnect event received)
+    else if (source === 'timeout' && callDuration < 2000) {
+      dropped = true;
+      rule = `Timeout fallback — short call (${callDuration}ms)`;
+    } else {
+      completed = true;
+      rule = `Default completed — ${source}, duration ${callDuration}ms, signal ${rsrp ?? 'unknown'} dBm`;
+    }
+
+    console.log(`[Voice] Call classified: ${dropped ? 'DROPPED' : completed ? 'COMPLETED' : 'IGNORED'} | Rule: ${rule}`);
+
+    if (dropped || completed) {
+      addVoiceSample({ callCompleted: completed, dropped });
+    }
+  };
+
+  const cancelPendingClassification = () => {
+    if (classifyTimeoutRef.current) {
+      clearTimeout(classifyTimeoutRef.current);
+      classifyTimeoutRef.current = null;
+    }
+    pendingCallRef.current = null;
+  };
+
+  // Track whether we're actually inside a real call (offhook state seen)
+  const isActiveCallRef = useRef(false);
+  // Track whether user has explicitly started capture
+  const isListeningRef = useRef(false);
+  // Reference to CallDisconnectModule subscription so we can remove it on Stop
+  const disconnectSubRef = useRef<any>(null);
+
+  // Call Metrics listener — only processes events relevant to real calls
   useEffect(() => {
     const subscription = CallMetrics.addListener(
       'callMetrics:update',
-      (payload: CallStateChangePayload) => {
+      async (payload: CallStateChangePayload) => {
+        // Ignore all events if user hasn't pressed Start
+        if (!isListeningRef.current) return;
 
         const now = Date.now();
-
         console.log('[Voice] Call state changed:', payload.state, payload);
 
         if (payload.state === 'ringing') {
-          // ...
+          // Incoming/outgoing call detected — record attempt
           callSetupStartTimeRef.current = now;
+          isActiveCallRef.current = false; // not yet connected
           addVoiceSample({ attempt: true });
-        } else if (payload.state === 'offhook') {
-          // ...
-          // Start MOS polling on active call
-          startMosPolling();
 
+        } else if (payload.state === 'offhook') {
+          // Call was answered/connected
           if (callSetupStartTimeRef.current !== null) {
-            // ... (setup time logic)
+            // Normal path: ringing → offhook
             const setupTime = now - callSetupStartTimeRef.current;
             addVoiceSample({ setupSuccessful: true, setupTimeMs: setupTime });
             callSetupStartTimeRef.current = null;
           } else {
-            // ...
-            addVoiceSample({ attempt: true, setupSuccessful: true, setupTimeMs: 500 });
+            // offhook without prior ringing (e.g. outgoing call skipped ringing event on some ROMs)
+            // We DO NOT invent a fake setupTimeMs — just record that setup succeeded without a time.
+            addVoiceSample({ attempt: true, setupSuccessful: true });
           }
           callStartTimeRef.current = now;
+          isActiveCallRef.current = true;
+          // MOS polling only runs while a real call is active
+          startMosPolling();
+
         } else if (payload.state === 'idle') {
-          // Stop MOS polling
+          // Call ended — defer classification until CallDisconnectEvent arrives
           stopMosPolling();
           setSignalMos(0);
 
-          // ... (call ended logic)
-          if (callStartTimeRef.current !== null) {
+          if (isActiveCallRef.current && callStartTimeRef.current !== null) {
+            // Real call ending — snapshot context for deferred classification
             const callDuration = now - callStartTimeRef.current;
-            const wasDropped = callDuration < 5000;
-            addVoiceSample({ attempt: false, callCompleted: !wasDropped, dropped: wasDropped });
-            callStartTimeRef.current = null;
+
+            // Snapshot current signal strength
+            let rsrp: number | null = null;
+            if (DeviceDiagnosticModule) {
+              try {
+                const diag = await DeviceDiagnosticModule.getFullDiagnostics();
+                if (diag?.rsrp) {
+                  rsrp = parseInt(diag.rsrp, 10);
+                  if (isNaN(rsrp)) rsrp = null;
+                }
+              } catch (e) {
+                console.warn('[Voice] Signal snapshot failed:', e);
+              }
+            }
+
+            console.log(`[Voice] Call ended — duration ${callDuration}ms, RSRP ${rsrp ?? 'unknown'} dBm. Waiting for disconnect event...`);
+
+            // Store context and wait for CallDisconnectEvent
+            cancelPendingClassification();
+            pendingCallRef.current = { callDuration, rsrp, timestamp: now };
+
+            // Timeout fallback: if no disconnect event arrives within 4s, classify anyway
+            classifyTimeoutRef.current = setTimeout(() => {
+              const pending = pendingCallRef.current;
+              if (pending) {
+                console.log('[Voice] Disconnect event timeout — using fallback classification');
+                classifyCall(pending); // no disconnect param → timeout rules
+                pendingCallRef.current = null;
+              }
+            }, 4000);
+
           } else if (callSetupStartTimeRef.current !== null) {
-            // ...
-            callSetupStartTimeRef.current = null;
+            // Ringing → idle (call never answered = failed setup, not a drop)
+            console.log('[Voice] Call setup aborted (never answered), not counted as drop');
           }
+          // If idle fires with no prior ringing/offhook: phantom event, ignore it
+
+          callStartTimeRef.current = null;
+          callSetupStartTimeRef.current = null;
+          isActiveCallRef.current = false;
         }
       }
     );
@@ -139,38 +256,14 @@ export default function VoiceScreen() {
     return () => {
       subscription?.remove();
       stopMosPolling();
+      cancelPendingClassification();
     };
   }, [addVoiceSample]);
 
-  // Listen for native disconnect causes (PSTN) if available
-  useEffect(() => {
-    if (!CallDisconnectModule) {
-      console.log('[Voice] CallDisconnectModule not available');
-      return;
-    }
 
-    const sub = CallDisconnectModule.addListener('CallDisconnectEvent', (payload) => {
-      console.log('[Voice] CallDisconnectEvent received:', payload);
+  // CallDisconnectModule listener is registered only when user presses Start
+  // (see handleStart / handleStop below — subscription managed there)
 
-      if (payload?.causeCode !== undefined || payload?.causeLabel) {
-        addVoiceSample({
-          attempt: false,
-          callCompleted: false,
-          dropped: false,
-          reasonCode: payload?.causeCode,
-          reasonLabel: payload?.causeLabel || 'Unknown',
-          reasonSource: payload?.source || 'native',
-        });
-      }
-    });
-
-    // Don't auto-start here - wait for user to click "Start listener"
-    console.log('[Voice] CallDisconnectEvent listener registered');
-
-    return () => {
-      sub?.remove();
-    };
-  }, [CallDisconnectModule, addVoiceSample]);
 
   const handleStart = async () => {
     try {
@@ -231,18 +324,44 @@ export default function VoiceScreen() {
 
       if (granted) {
         await CallMetrics.start();
+        isListeningRef.current = true;
 
-        // Also start the disconnect cause listener if available
-        if (CallDisconnectModule?.startListening) {
+        // Register CallDisconnect listener NOW (only after user explicitly starts)
+        if (CallDisconnectModule) {
           try {
             await CallDisconnectModule.startListening();
+            disconnectSubRef.current = CallDisconnectModule.addListener('CallDisconnectEvent', (payload) => {
+              console.log('[Voice] CallDisconnectEvent received:', payload);
+
+              // ── Deferred classification trigger ──
+              // If a pending call is waiting for this event, classify it now
+              const pending = pendingCallRef.current;
+              if (pending) {
+                // Cancel the fallback timeout
+                if (classifyTimeoutRef.current) {
+                  clearTimeout(classifyTimeoutRef.current);
+                  classifyTimeoutRef.current = null;
+                }
+                classifyCall(pending, {
+                  causeLabel: payload?.causeLabel,
+                  duration: payload?.duration,
+                });
+                pendingCallRef.current = null;
+              }
+
+              // Always record the disconnect reason for analytics
+              if (payload?.causeCode !== undefined || payload?.causeLabel) {
+                addVoiceSample({
+                  reasonCode: payload?.causeCode,
+                  reasonLabel: payload?.causeLabel || 'Unknown',
+                  reasonSource: payload?.source || 'native',
+                });
+              }
+            });
             console.log('[Voice] CallDisconnectModule started successfully');
           } catch (e) {
             console.warn('[Voice] CallDisconnectModule start failed:', e);
-            Alert.alert('Warning', 'Call metrics started but disconnect cause listener failed: ' + e.message);
           }
-        } else {
-          console.warn('[Voice] CallDisconnectModule not available');
         }
 
         setIsListening(true);
@@ -271,6 +390,18 @@ export default function VoiceScreen() {
   const handleStop = async () => {
     try {
       await CallMetrics.stop();
+      isListeningRef.current = false;
+      isActiveCallRef.current = false;
+      callStartTimeRef.current = null;
+      callSetupStartTimeRef.current = null;
+      stopMosPolling();
+      cancelPendingClassification();
+
+      // Remove CallDisconnect listener
+      if (disconnectSubRef.current) {
+        disconnectSubRef.current.remove();
+        disconnectSubRef.current = null;
+      }
       if (CallDisconnectModule?.stopListening) {
         try {
           await CallDisconnectModule.stopListening();

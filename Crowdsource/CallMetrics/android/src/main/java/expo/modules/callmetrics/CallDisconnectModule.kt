@@ -16,6 +16,8 @@ class CallDisconnectModule : Module() {
   private var contentObserver: ContentObserver? = null
   private var isListening = false
   private var lastCallId: Long = -1
+  // Skip the first call log read after registration to avoid emitting stale data
+  private var isFirstChange = true
 
   override fun definition() = ModuleDefinition {
     Name("CallDisconnectModule")
@@ -47,6 +49,9 @@ class CallDisconnectModule : Module() {
 
       val contentResolver: ContentResolver = context.contentResolver
       
+      // Seed lastCallId with the current most-recent call so we never emit it
+      seedLastCallId(contentResolver)
+
       // Create a ContentObserver to watch for changes in CallLog
       contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean, uri: Uri?) {
@@ -69,9 +74,8 @@ class CallDisconnectModule : Module() {
       )
 
       isListening = true
-      
-      // Check for any existing recent calls on startup
-      checkLatestCallDisconnectCause(context, contentResolver)
+      // NOTE: we intentionally do NOT call checkLatestCallDisconnectCause here.
+      // The observer will fire only for NEW calls that happen after registration.
       
       true
     }
@@ -86,7 +90,30 @@ class CallDisconnectModule : Module() {
       
       isListening = false
       lastCallId = -1
+      isFirstChange = true
       true
+    }
+  }
+
+  /**
+   * Read the current most-recent call ID so we never emit stale history.
+   */
+  private fun seedLastCallId(contentResolver: ContentResolver) {
+    try {
+      val cursor = contentResolver.query(
+        CallLog.Calls.CONTENT_URI,
+        arrayOf(CallLog.Calls._ID),
+        null,
+        null,
+        "${CallLog.Calls.DATE} DESC"
+      )
+      cursor?.use {
+        if (it.moveToFirst()) {
+          lastCallId = it.getLong(it.getColumnIndexOrThrow(CallLog.Calls._ID))
+        }
+      }
+    } catch (e: Exception) {
+      android.util.Log.w("CallDisconnectModule", "Could not seed lastCallId: ${e.message}")
     }
   }
 
@@ -114,14 +141,13 @@ class CallDisconnectModule : Module() {
         if (it.moveToFirst() && !it.isAfterLast) {
           val callId = it.getLong(it.getColumnIndexOrThrow(CallLog.Calls._ID))
           
-          // Only process if this is a new call (different ID)
+          // Only process if this is a new call (different ID from last seen)
           if (callId != lastCallId) {
             lastCallId = callId
             
             val callType = it.getInt(it.getColumnIndexOrThrow(CallLog.Calls.TYPE))
             val duration = it.getInt(it.getColumnIndexOrThrow(CallLog.Calls.DURATION))
             val date = it.getLong(it.getColumnIndexOrThrow(CallLog.Calls.DATE))
-            val number = it.getString(it.getColumnIndexOrThrow(CallLog.Calls.NUMBER)) ?: ""
 
             // Determine disconnect cause based on call type and duration
             // CallLog.Calls.TYPE: INCOMING_TYPE=1, OUTGOING_TYPE=2, MISSED_TYPE=3
@@ -138,20 +164,17 @@ class CallDisconnectModule : Module() {
               else -> Pair(-1, "UNKNOWN")
             }
 
-            // Only send event if call ended (not for new calls)
-            if (duration >= 0) {
-              val event = mapOf(
-                "causeCode" to causeCode,
-                "causeLabel" to causeLabel,
-                "timestamp" to date,
-                "duration" to duration,
-                "callType" to callType,
-                "phoneNumber" to number,
-                "source" to "calllog"
-              )
-              
-              sendEvent("CallDisconnectEvent", event)
-            }
+            val event = mapOf(
+              "causeCode" to causeCode,
+              "causeLabel" to causeLabel,
+              "timestamp" to date,
+              "duration" to duration,
+              "callType" to callType,
+              "phoneNumber" to "", // Intentionally empty — avoid leaking PII
+              "source" to "calllog"
+            )
+            
+            sendEvent("CallDisconnectEvent", event)
           }
         }
       }
@@ -161,4 +184,3 @@ class CallDisconnectModule : Module() {
     }
   }
 }
-

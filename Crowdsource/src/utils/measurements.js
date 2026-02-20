@@ -182,6 +182,8 @@ export const runHttpDownloadTest = async ({ addHttpSample, silent = false }) => 
             'https://httpbin.org/bytes/10485760',
         ];
 
+        // Start timer BEFORE fetch so we capture connection + transfer + blob read
+        const startTime = Date.now();
         let response = null;
         for (const url of testUrls) {
             try {
@@ -195,9 +197,8 @@ export const runHttpDownloadTest = async ({ addHttpSample, silent = false }) => 
 
         if (!response || !response.ok) throw new Error('All DL URLs failed');
 
-        const startTime = Date.now();
         const blob = await response.blob();
-        const duration = Date.now() - startTime;
+        const duration = Date.now() - startTime; // Total: connection + transfer + blob read
         const throughputMbps = (blob.size * 8 * 1000) / (Math.max(duration, 1) * 1000000);
 
         addHttpSample('dl', { completed: true, throughputMbps });

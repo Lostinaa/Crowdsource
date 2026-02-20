@@ -15,6 +15,7 @@ import com.google.android.gms.location.CurrentLocationRequest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
 import java.text.DecimalFormat
+
 class DeviceDiagnosticModule : Module() {
 
     private val moduleScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -102,16 +103,17 @@ class DeviceDiagnosticModule : Module() {
                 ss != null && ss.ssRsrp != Int.MAX_VALUE && ss.ssRsrp > -140
             }
 
-            val signalInfo = checkSignalInfo(tm)
+            // Read signal from the registered (serving) cell — same cell used for identity below
+            val registeredInfo = allCellInfo.find { it.isRegistered } ?: allCellInfo[0]
+            val signalInfo = checkSignalInfo(registeredInfo)
             data["rsrp"] = signalInfo[0]
             data["rsrq"] = signalInfo[1]
             data["rssnr"] = signalInfo[2]
             data["cqi"] = signalInfo[3]
 
-            val info = allCellInfo.find { it.isRegistered } ?: allCellInfo[0]
-            when (info) {
+            when (registeredInfo) {
                 is CellInfoLte -> {
-                    val id = info.cellIdentity
+                    val id = registeredInfo.cellIdentity
                     data["netType"] = if (hasNrNeighbor) "5G NR (NSA)" else "4G LTE"
                     data["enb"] = if (id.ci != Int.MAX_VALUE) (id.ci shr 8).toString() else "---"
                     data["eci"] = formatValue(id.ci)
@@ -121,10 +123,13 @@ class DeviceDiagnosticModule : Module() {
                 }
                 is CellInfoNr -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        val id = info.cellIdentity as CellIdentityNr
+                        val id = registeredInfo.cellIdentity as CellIdentityNr
                         data["netType"] = "5G NR"
                         data["enb"] = if (id.nci != Long.MAX_VALUE) (id.nci / 16384).toString() else "---"
                         data["eci"] = formatValue(id.nci)
+                        data["cellId"] = if (id.nci != Long.MAX_VALUE) (id.nci % 16384).toString() else "---"
+                        data["tac"] = formatValue(id.tac)
+                        data["pci"] = formatValue(id.pci)
                     }
                 }
             }
@@ -133,39 +138,30 @@ class DeviceDiagnosticModule : Module() {
         }
     }
 
-    private fun checkSignalInfo(tm: TelephonyManager): Array<String> {
+    /**
+     * Extract signal strength values from a specific CellInfo object (the serving cell).
+     * Previously this read from cellInfos[0] which could be a neighbor cell.
+     */
+    private fun checkSignalInfo(cellInfo: CellInfo): Array<String> {
         val numbers = arrayOf("---", "---", "---", "---")
-        
-        val safeContext = appContext.reactContext
 
-        if (safeContext != null) {
-            val cellInfos: List<CellInfo>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                if (ActivityCompat.checkSelfPermission(safeContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                    tm.allCellInfo
-                } else {
-                    null
-                }
-            } else null
-
-            if (cellInfos != null && cellInfos.isNotEmpty()) {
-                when (val info = cellInfos[0]) {
-                    is CellInfoLte -> {
-                        val signal = info.cellSignalStrength
-                        numbers[0] = formatValue(signal.rsrp)
-                        numbers[1] = formatValue(signal.rsrq)
-                        numbers[2] = formatValue(signal.rssnr)
-                        numbers[3] = formatValue(signal.cqi)
-                    }
-                    is CellInfoNr -> {
-                        val signal = info.cellSignalStrength as CellSignalStrengthNr
-                        numbers[0] = formatValue(signal.ssRsrp)
-                        numbers[1] = formatValue(signal.ssRsrq)
-                        numbers[2] = formatValue(signal.csiSinr)
-                        numbers[3] = "---"
-                    }
-                }
+        when (cellInfo) {
+            is CellInfoLte -> {
+                val signal = cellInfo.cellSignalStrength
+                numbers[0] = formatValue(signal.rsrp)
+                numbers[1] = formatValue(signal.rsrq)
+                numbers[2] = formatValue(signal.rssnr)
+                numbers[3] = formatValue(signal.cqi)
+            }
+            is CellInfoNr -> {
+                val signal = cellInfo.cellSignalStrength as CellSignalStrengthNr
+                numbers[0] = formatValue(signal.ssRsrp)
+                numbers[1] = formatValue(signal.ssRsrq)
+                numbers[2] = formatValue(signal.csiSinr)
+                numbers[3] = "---"
             }
         }
+
         return numbers
     }
 

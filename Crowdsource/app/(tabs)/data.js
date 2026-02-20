@@ -99,6 +99,16 @@ export default function DataScreen() {
     return `${kbps.toFixed(2)} Kbps`;
   };
 
+  // Browsing URLs — same rotation as measurements.js
+  const BROWSING_URLS = [
+    'https://www.google.com/',
+    'https://www.facebook.com/',
+    'https://www.amazon.com/',
+    'https://www.chatgpt.com/',
+    'https://www.wikipedia.org/',
+  ];
+  const browsingUrlIndexRef = useRef(0);
+
   // Browsing test with WebView (nPerf-style)
   const testBrowsing = async ({ silent = false, showAlert = true } = {}) => {
     if (isTesting && !silent) return;
@@ -120,14 +130,14 @@ export default function DataScreen() {
       return;
     }
 
-    // Silent mode: run background test
+    // Silent mode: run background test with URL rotation
     setIsTesting(true);
+    const testUrl = BROWSING_URLS[browsingUrlIndexRef.current % BROWSING_URLS.length];
+    browsingUrlIndexRef.current++;
     const startTime = Date.now();
     addBrowsingSample({ request: true });
 
     try {
-      const testUrl = 'https://www.google.com/favicon.ico';
-      //change url  https://ethiojobs.net/
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -158,7 +168,6 @@ export default function DataScreen() {
           dnsResolutionTimeMs: dnsTime,
           throughputKbps: throughputKbps,
         });
-
       }
     } catch (error) {
       console.error('[Data] Browsing test error:', error);
@@ -186,8 +195,10 @@ export default function DataScreen() {
 
     try {
       if (completedType === 'browsing') {
+        // Note: request was already counted when testBrowsing opened the WebView
+        // Only record the completion result here — do NOT set request:true again
         addBrowsingSample({
-          request: true,
+          request: true, // WebView path needs its own request count since testBrowsing returns early
           completed: result.success,
           durationMs: result.duration,
           dnsResolutionTimeMs: result.dnsTime,
@@ -220,6 +231,7 @@ export default function DataScreen() {
           request: true,
           completed: result.success,
           score: Math.round(latencyScore),
+          latencyMs: result.duration, // Pass latencyMs so it's recorded in the backend
         });
         setImmediate(() => {
           Alert.alert(
@@ -480,6 +492,9 @@ export default function DataScreen() {
       let response = null;
       let lastError = null;
 
+      // Start timer BEFORE fetch so we measure total download time (connection + transfer + blob read)
+      const startTime = Date.now();
+
       // Try each URL until one works
       for (const url of testUrls) {
         try {
@@ -510,26 +525,19 @@ export default function DataScreen() {
         throw lastError || new Error('All download URLs failed');
       }
 
-      const startTime = Date.now();
-
-      // Measure download throughput
-      const downloadStart = Date.now();
+      // Measure download throughput (startTime was set before fetch loop)
       const blob = await response.blob();
-      const downloadTime = Date.now() - downloadStart;
       const totalTime = Date.now() - startTime;
 
       // Calculate throughput in Mbps
       const sizeBytes = blob.size;
-      // Use Math.max to ensure we never divide by 0, and use at least 1ms
-      // For very fast downloads, use total time as fallback
-      const effectiveTime = Math.max(downloadTime, totalTime, 1);
+      const effectiveTime = Math.max(totalTime, 1);
       const throughputMbps = sizeBytes > 0 && effectiveTime > 0
         ? (sizeBytes * 8 * 1000) / (effectiveTime * 1000000) // Convert bytes to bits, ms to seconds, then to Mbps
         : 0;
 
       console.log('[Data] HTTP download throughput calc:', {
         sizeBytes,
-        downloadTime,
         totalTime,
         effectiveTime,
         throughputMbps,

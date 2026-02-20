@@ -46,8 +46,11 @@ export default function GlobalAutoSync() {
         const currentMetrics = metricsRef.current;
         const currentScores = scoresRef.current;
 
-        // Don't send if there are no meaningful metrics
-        const hasVoice = (currentMetrics?.voice?.attempts || 0) > 0;
+        // Don't send if there are no meaningful metrics.
+        // Voice: require at least one attempt AND one resolved call (completed or dropped).
+        // This prevents MOS-only or setup-only phantom data from being uploaded.
+        const hasVoice = (currentMetrics?.voice?.attempts || 0) > 0
+            && ((currentMetrics?.voice?.completed || 0) + (currentMetrics?.voice?.dropped || 0)) > 0;
         const hasData = (currentMetrics?.data?.browsing?.requests || 0) > 0
             || (currentMetrics?.data?.http?.dl?.requests || 0) > 0
             || (currentMetrics?.data?.streaming?.requests || 0) > 0;
