@@ -5,15 +5,28 @@ import NetInfo from '@react-native-community/netinfo';
  * These functions perform network requests and update the QoE state.
  */
 
+// QA-specified browsing URLs (rotated sequentially through all 5)
+const BROWSING_URLS = [
+    'https://www.google.com/',
+    'https://www.facebook.com/',
+    'https://www.amazon.com/',
+    'https://www.chatgpt.com/',
+    'https://www.wikipedia.org/',
+];
+let browsingUrlIndex = 0;
+
 export const runBrowsingTest = async ({ addBrowsingSample, silent = false }) => {
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) return { success: false, error: 'No Internet' };
+
+    // Rotate through all browsing URLs (QA requirement)
+    const testUrl = BROWSING_URLS[browsingUrlIndex % BROWSING_URLS.length];
+    browsingUrlIndex++;
 
     const startTime = Date.now();
     addBrowsingSample({ request: true });
 
     try {
-        const testUrl = 'https://www.google.com/favicon.ico';
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -44,7 +57,7 @@ export const runBrowsingTest = async ({ addBrowsingSample, silent = false }) => 
                 dnsResolutionTimeMs: dnsTime,
                 throughputKbps: throughputKbps,
             });
-            return { success: true, duration, throughputKbps };
+            return { success: true, duration, throughputKbps, url: testUrl };
         }
         throw new Error(`HTTP ${response.status}`);
     } catch (error) {
@@ -61,10 +74,11 @@ export const runStreamingTest = async ({ addStreamingSample, silent = false }) =
     addStreamingSample({ request: true });
 
     try {
+        // QA-specified: YouTube short video URL for streaming test
         const testUrls = [
+            'https://www.youtube.com/watch?v=aJq936yAUbc',
             'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png',
             'https://httpbin.org/image/png',
-            'https://www.google.com/favicon.ico',
         ];
 
         let response = null;
@@ -95,9 +109,10 @@ export const runStreamingTest = async ({ addStreamingSample, silent = false }) =
         const effectiveTime = Math.max(streamTime, totalTime, 1);
         const throughputKbps = totalBytes > 0 && effectiveTime > 0 ? (totalBytes * 8) / effectiveTime : 0;
 
-        const mos = throughputKbps > 5000 ? 4.5 : throughputKbps > 2000 ? 4.0 : throughputKbps > 1000 ? 3.5 : 2.5;
-        const resolution = throughputKbps > 5000 ? 'HD' : throughputKbps > 2000 ? 'SD' : '360p';
-        const bufferingCount = throughputKbps > 5000 ? 0 : 1;
+        // MOS and resolution mapping per ITU-T G.1035
+        const mos = throughputKbps > 8000 ? 4.5 : throughputKbps > 4000 ? 4.0 : throughputKbps > 2000 ? 3.5 : throughputKbps > 500 ? 3.0 : 2.5;
+        const resolution = throughputKbps > 8000 ? '1080p' : throughputKbps > 4000 ? 'HD (720p)' : throughputKbps > 2000 ? 'SD (480p)' : '360p';
+        const bufferingCount = throughputKbps > 8000 ? 0 : throughputKbps > 4000 ? 1 : 2;
 
         addStreamingSample({
             request: false,
@@ -160,15 +175,33 @@ export const runHttpDownloadTest = async ({ addHttpSample, silent = false }) => 
     addHttpSample('dl', { request: true });
 
     try {
-        const url = 'https://www.google.com/favicon.ico';
+        // QA-specified: 10MB test file
+        const testUrls = [
+            'https://speed.hetzner.de/10MB.bin',
+            'https://proof.ovh.net/files/10Mb.dat',
+            'https://httpbin.org/bytes/10485760',
+        ];
+
+        let response = null;
+        for (const url of testUrls) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 30000);
+                response = await fetch(url, { method: 'GET', cache: 'no-cache', signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (response.ok) break;
+            } catch (e) { response = null; continue; }
+        }
+
+        if (!response || !response.ok) throw new Error('All DL URLs failed');
+
         const startTime = Date.now();
-        const response = await fetch(url, { method: 'GET', cache: 'no-cache' });
         const blob = await response.blob();
         const duration = Date.now() - startTime;
         const throughputMbps = (blob.size * 8 * 1000) / (Math.max(duration, 1) * 1000000);
 
         addHttpSample('dl', { completed: true, throughputMbps });
-        return { success: true, throughputMbps };
+        return { success: true, throughputMbps, sizeBytes: blob.size };
     } catch (error) {
         console.error('[Measurements] HTTP DL test error:', error);
         return { success: false, error: error.message };
@@ -182,11 +215,13 @@ export const runHttpUploadTest = async ({ addHttpSample, silent = false }) => {
     addHttpSample('ul', { request: true });
 
     try {
-        const testData = 'x'.repeat(100 * 1024); // 100KB
+        // QA-specified: 5MB upload
+        const testData = 'x'.repeat(5 * 1024 * 1024); // 5MB
         const startTime = Date.now();
         const response = await fetch('https://httpbin.org/post', {
             method: 'POST',
             body: testData,
+            headers: { 'Content-Type': 'text/plain' },
         });
         const duration = Date.now() - startTime;
         const throughputMbps = (testData.length * 8 * 1000) / (Math.max(duration, 1) * 1000000);
@@ -207,10 +242,11 @@ export const runSocialTest = async ({ addSocialSample, silent = false }) => {
     addSocialSample({ request: true });
 
     try {
+        // QA-specified: Facebook and X (Twitter)
         const testUrls = [
-            'https://www.facebook.com',
-            'https://m.facebook.com',
-            'https://jsonplaceholder.typicode.com/posts/1',
+            'https://www.facebook.com/',
+            'https://www.x.com/',
+            'https://m.facebook.com/',
         ];
 
         let response = null;

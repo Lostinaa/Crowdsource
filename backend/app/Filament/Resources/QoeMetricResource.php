@@ -332,15 +332,26 @@ class QoeMetricResource extends Resource
                     Tables\Actions\BulkAction::make('export_csv')
                         ->label('Export to CSV')
                         ->icon('heroicon-o-document-arrow-down')
-                        ->action(function (\Illuminate\Support\Collection $records) {
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (\Illuminate\Support\Collection $records, \Livewire\Component $livewire) {
+                            // Use the filtered query to respect active date/filter selections
+                            // This ensures the export matches what the user filtered, not just selected rows
+                            try {
+                                $filteredRecords = $livewire->getFilteredTableQuery()->get();
+                            } catch (\Throwable $e) {
+                                $filteredRecords = $records; // Fallback to selected records
+                            }
+
                             $filename = 'qoe_metrics_' . date('Y-m-d_H-i-s') . '.csv';
                             $headers = [
                                 'Content-Type' => 'text/csv',
                                 'Content-Disposition' => "attachment; filename=\"$filename\"",
                             ];
 
-                            $callback = function () use ($records) {
+                            $callback = function () use ($filteredRecords) {
+                                $records = $filteredRecords;
                                 $file = fopen('php://output', 'w');
+
 
                                 // Helper to safely read scores (flat or nested)
                                 $getScore = function ($scores, $type) {

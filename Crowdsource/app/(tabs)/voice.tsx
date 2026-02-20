@@ -246,7 +246,7 @@ export default function VoiceScreen() {
         }
 
         setIsListening(true);
-        Alert.alert('Success', 'Call listener started. Make or receive a call to see events.');
+        Alert.alert('Success', 'Capturing metrics started. Make or receive a call to see events.');
       } else {
         Alert.alert(
           'Permission required',
@@ -344,26 +344,6 @@ export default function VoiceScreen() {
 
         </View>
 
-        {/* Call Disconnect Reason */}
-        <View style={styles.metricsBox}>
-          <Text style={styles.sectionTitle}>Last Disconnect Reason</Text>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Reason</Text>
-            <Text style={styles.metricValue}>
-              {metrics.voice.reasons?.length > 0
-                ? metrics.voice.reasons[metrics.voice.reasons.length - 1].label
-                : 'No data yet'}
-            </Text>
-          </View>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Source</Text>
-            <Text style={styles.metricValue}>
-              {metrics.voice.reasons?.length > 0
-                ? metrics.voice.reasons[metrics.voice.reasons.length - 1].source || '--'
-                : '--'}
-            </Text>
-          </View>
-        </View>
       </ScrollView>
     </View>
   );

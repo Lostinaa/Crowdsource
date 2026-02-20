@@ -42,6 +42,37 @@ const getNetworkCategory = (value: string | null | undefined): keyof typeof NETW
   return 'unknown';
 };
 
+/** Returns human-readable network technology label from native or NetInfo data. */
+const getNetworkLabel = (
+  netType: string | null | undefined,
+  category: keyof typeof NETWORK_COLORS,
+  cellularGen: string | null | undefined,
+): string => {
+  // Native netType is most accurate (handles 5G NSA, NR, etc.)
+  if (netType) {
+    const upper = netType.toUpperCase();
+    if (upper.includes('NR') || upper.includes('5G')) return '5G NR';
+    if (upper.includes('LTE')) return '4G LTE';
+    if (upper.includes('HSPA+') || upper.includes('HSPAP')) return '3G HSPA+';
+    if (upper.includes('HSPA')) return '3G HSPA';
+    if (upper.includes('UMTS')) return '3G UMTS';
+    if (upper.includes('EDGE')) return '2G EDGE';
+    if (upper.includes('GPRS')) return '2G GPRS';
+    return netType; // Return as-is if unrecognized but not null
+  }
+  // NetInfo cellular generation fallback
+  if (cellularGen) {
+    const g = cellularGen.toLowerCase();
+    if (g === '5g') return '5G';
+    if (g === '4g') return '4G LTE';
+    if (g === '3g') return '3G';
+    if (g === '2g') return '2G';
+  }
+  // Category-only fallback
+  if (category !== 'unknown') return category;
+  return 'Detecting...';
+};
+
 export default function MapScreen() {
   const { metrics } = useQoE();
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
@@ -359,7 +390,13 @@ export default function MapScreen() {
               <Text style={styles.infoLabel}>Network</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View style={[styles.networkIndicator, { backgroundColor: networkColor }]} />
-                <Text style={styles.infoValue}>{diagnostics?.netType || networkCategory}</Text>
+                <Text style={styles.infoValue}>
+                  {getNetworkLabel(
+                    diagnostics?.netType,
+                    networkCategory,
+                    networkState?.details?.cellularGeneration,
+                  )}
+                </Text>
               </View>
             </View>
           </View>

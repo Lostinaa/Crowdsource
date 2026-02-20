@@ -4,30 +4,52 @@ namespace App\Filament\Widgets;
 
 use App\Http\Controllers\AnalyticsController;
 use Filament\Widgets\Widget;
+use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class EnhancedAnalyticsWidget extends Widget
 {
+    use InteractsWithPageFilters;
+
     protected static string $view = 'filament.widgets.enhanced-analytics-widget';
-    
-    protected static ?int $sort = 3;
-    
+
+    protected static ?int $sort = 5;
+
     protected int|string|array $columnSpan = 'full';
 
     public function getVoiceData(): array
     {
-        $analyticsController = new AnalyticsController();
+        $startDate = $this->filters['startDate'] ?? Carbon::today()->toDateString();
+        $endDate = $this->filters['endDate'] ?? Carbon::today()->toDateString();
+        $region = $this->filters['region'] ?? '';
+
         $request = new Request();
-        
+        $request->merge([
+            'start_date' => Carbon::parse($startDate)->startOfDay()->toIso8601String(),
+            'end_date' => Carbon::parse($endDate)->endOfDay()->toIso8601String(),
+            'region' => $region ?: null,
+        ]);
+
+        $analyticsController = new AnalyticsController();
         $voiceResponse = $analyticsController->voice($request);
         return json_decode($voiceResponse->getContent(), true)['data'] ?? [];
     }
 
     public function getDataAnalytics(): array
     {
-        $analyticsController = new AnalyticsController();
+        $startDate = $this->filters['startDate'] ?? Carbon::today()->toDateString();
+        $endDate = $this->filters['endDate'] ?? Carbon::today()->toDateString();
+        $region = $this->filters['region'] ?? '';
+
         $request = new Request();
-        
+        $request->merge([
+            'start_date' => Carbon::parse($startDate)->startOfDay()->toIso8601String(),
+            'end_date' => Carbon::parse($endDate)->endOfDay()->toIso8601String(),
+            'region' => $region ?: null,
+        ]);
+
+        $analyticsController = new AnalyticsController();
         $dataResponse = $analyticsController->data($request);
         return json_decode($dataResponse->getContent(), true)['data'] ?? [];
     }

@@ -35,7 +35,9 @@ export default function DataScreen() {
     addFtpSample,
     addLatencySample,
     runFullTest,
-    isTesting: isTestingContext
+    isTesting: isTestingContext,
+    testLabel,
+    testProgress,
   } = useQoE();
 
   const [isTesting, setIsTesting] = useState(false);
@@ -263,11 +265,11 @@ export default function DataScreen() {
     addStreamingSample({ request: true });
 
     try {
-      // Try multiple fallback URLs for streaming test (using smaller files to avoid crashes)
+      // QA-specified: YouTube short video URL for streaming
       const testUrls = [
-        'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png', // Small image (safest)
-        'https://httpbin.org/image/png', // Small test image
-        'https://www.google.com/favicon.ico', // Very small file
+        'https://www.youtube.com/watch?v=aJq936yAUbc',
+        'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png',
+        'https://httpbin.org/image/png',
       ];
 
       let response = null;
@@ -468,11 +470,11 @@ export default function DataScreen() {
     addHttpSample('dl', { request: true });
 
     try {
-      // Try multiple fallback URLs for download test
+      // QA-specified: 10MB test file
       const testUrls = [
-        'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png',
-        'https://www.google.com/favicon.ico',
-        'https://httpbin.org/image/png',
+        'https://speed.hetzner.de/10MB.bin',
+        'https://proof.ovh.net/files/10Mb.dat',
+        'https://httpbin.org/bytes/10485760',
       ];
 
       let response = null;
@@ -581,8 +583,8 @@ export default function DataScreen() {
     addHttpSample('ul', { request: true });
 
     try {
-      // Create test data to upload (100KB) as plain text to avoid ArrayBuffer issues
-      const testDataSize = 100 * 1024; // 100KB
+      // QA-specified: 5MB upload
+      const testDataSize = 5 * 1024 * 1024; // 5MB
       const testData = 'x'.repeat(testDataSize);
 
       // Use a test upload endpoint (httpbin.org provides a free test endpoint)
@@ -663,11 +665,11 @@ export default function DataScreen() {
     addSocialSample({ request: true });
 
     try {
-      // Try multiple fallback URLs for social media API test
+      // QA-specified: Facebook and X (Twitter)
       const testUrls = [
-        'https://www.facebook.com',
-        'https://m.facebook.com',
-        'https://jsonplaceholder.typicode.com/posts/1',
+        'https://www.facebook.com/',
+        'https://www.x.com/',
+        'https://m.facebook.com/',
       ];
 
       let response = null;
@@ -817,9 +819,12 @@ export default function DataScreen() {
         ? (sizeBytes * 8 * 1000) / totalTime
         : 0;
 
+      // Cap at 1Gbps to prevent exaggerated readings from near-zero timing
+      const cappedThroughputKbps = Math.min(throughputKbps, 1000 * 1000);
+
       addFtpSample('dl', {
         completed: true,
-        throughputKbps: throughputKbps,
+        throughputKbps: cappedThroughputKbps,
       });
 
       console.log('[Data] FTP download success, silent:', silent);
@@ -827,7 +832,7 @@ export default function DataScreen() {
         console.log('[Data] Showing FTP download success alert');
         Alert.alert(
           'FTP Download Success',
-          `Throughput: ${(throughputKbps / 1000).toFixed(2)} Mbps\nSize: ${(sizeBytes / 1024).toFixed(2)} KB`,
+          `Throughput: ${(cappedThroughputKbps / 1000).toFixed(2)} Mbps\nSize: ${(sizeBytes / 1024).toFixed(2)} KB`,
         );
       }
 
@@ -915,9 +920,12 @@ export default function DataScreen() {
         ? (testDataSize * 8 * 1000) / uploadTime
         : 0;
 
+      // Cap at 1Gbps to prevent exaggerated readings from near-zero timing
+      const cappedThroughputKbps = Math.min(throughputKbps, 1000 * 1000);
+
       addFtpSample('ul', {
         completed: true,
-        throughputKbps: throughputKbps,
+        throughputKbps: cappedThroughputKbps,
       });
 
       console.log('[Data] FTP upload success, silent:', silent);
@@ -925,7 +933,7 @@ export default function DataScreen() {
         console.log('[Data] Showing FTP upload success alert');
         Alert.alert(
           'FTP Upload Success',
-          `Throughput: ${(throughputKbps / 1000).toFixed(2)} Mbps\nSize: ${(testDataSize / 1024).toFixed(2)} KB`,
+          `Throughput: ${(cappedThroughputKbps / 1000).toFixed(2)} Mbps\nSize: ${(testDataSize / 1024).toFixed(2)} KB`,
         );
       }
 
@@ -1020,6 +1028,7 @@ export default function DataScreen() {
       addLatencySample({
         completed: true,
         score: interactivityScore,
+        latencyMs: avgLatency,
       });
 
       console.log('[Data] Latency test success, silent:', silent);
@@ -1067,7 +1076,9 @@ export default function DataScreen() {
         {isTesting && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.loadingText}>Running test...</Text>
+            <Text style={styles.loadingText}>
+              {testLabel || 'Running test...'}
+            </Text>
           </View>
         )}
 

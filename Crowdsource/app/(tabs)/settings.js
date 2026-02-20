@@ -211,7 +211,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* App Information Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>App Information</Text>
           <SettingItem
@@ -220,13 +219,8 @@ export default function SettingsScreen() {
             onPress={null}
           />
           <SettingItem
-            title="Scoring Standard"
-            description="ETSI TR 103 559"
-            onPress={null}
-          />
-          <SettingItem
             title="About"
-            description="Crowdsourcing QoE Measurement App"
+            description="teleCrowd App — QoE Measurement by Ethio Telecom"
             onPress={null}
           />
         </View>

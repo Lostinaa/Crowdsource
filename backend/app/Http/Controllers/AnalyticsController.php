@@ -84,6 +84,15 @@ class AnalyticsController extends Controller
         if ($request->user()) {
             $query->where('user_id', $request->user()->id);
         }
+        if ($request->has('start_date')) {
+            $query->where('timestamp', '>=', $request->input('start_date'));
+        }
+        if ($request->has('end_date')) {
+            $query->where('timestamp', '<=', $request->input('end_date'));
+        }
+        if ($request->has('region') && $request->input('region')) {
+            $query->where('region', $request->input('region'));
+        }
 
         $metrics = $query->get();
 
@@ -139,6 +148,15 @@ class AnalyticsController extends Controller
 
         if ($request->user()) {
             $query->where('user_id', $request->user()->id);
+        }
+        if ($request->has('start_date')) {
+            $query->where('timestamp', '>=', $request->input('start_date'));
+        }
+        if ($request->has('end_date')) {
+            $query->where('timestamp', '<=', $request->input('end_date'));
+        }
+        if ($request->has('region') && $request->input('region')) {
+            $query->where('region', $request->input('region'));
         }
 
         $metrics = $query->get();
