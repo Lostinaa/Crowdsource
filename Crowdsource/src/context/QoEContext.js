@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateScores } from '../utils/scoring';
 import * as Measurements from '../utils/measurements';
@@ -67,6 +67,7 @@ export const QoEProvider = ({ children }) => {
   const [isTesting, setIsTesting] = useState(false);
   const [testProgress, setTestProgress] = useState(0);
   const [testLabel, setTestLabel] = useState('');
+  const [triggerSync, setTriggerSync] = useState(0);
 
   // ... (Load effect handled in previous step)
 
@@ -503,6 +504,8 @@ export const QoEProvider = ({ children }) => {
         { label: 'Testing Streaming...', fn: Measurements.runStreamingTest },
         { label: 'Measuring Download...', fn: Measurements.runHttpDownloadTest },
         { label: 'Measuring Upload...', fn: Measurements.runHttpUploadTest },
+        { label: 'Testing FTP DL...', fn: Measurements.runFtpDownloadTest },
+        { label: 'Testing FTP UL...', fn: Measurements.runFtpUploadTest },
         { label: 'Testing Social Media...', fn: Measurements.runSocialTest },
       ];
 
@@ -531,6 +534,7 @@ export const QoEProvider = ({ children }) => {
       setIsTesting(false);
       setTestProgress(0);
       setTestLabel('');
+      setTriggerSync(Date.now());
     }
   }, [
     isTesting,
@@ -538,7 +542,8 @@ export const QoEProvider = ({ children }) => {
     addStreamingSample,
     addLatencySample,
     addHttpSample,
-    addSocialSample
+    addSocialSample,
+    addFtpSample
   ]);
 
   const value = useMemo(
@@ -560,6 +565,7 @@ export const QoEProvider = ({ children }) => {
       isTesting,
       testProgress,
       testLabel,
+      triggerSync,
     }),
     [
       metrics,
@@ -579,6 +585,7 @@ export const QoEProvider = ({ children }) => {
       isTesting,
       testProgress,
       testLabel,
+      triggerSync,
     ]
   );
 

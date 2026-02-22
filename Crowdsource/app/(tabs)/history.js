@@ -77,28 +77,6 @@ export default function HistoryScreen() {
         <Text style={styles.detailsTime}>{formatTime(entry.timestamp)}</Text>
 
         <View style={styles.detailsSection}>
-          <Text style={styles.detailsSectionTitle}>Overall Scores</Text>
-          <View style={styles.detailsRow}>
-            <Text style={styles.detailsLabel}>Overall QoE:</Text>
-            <Text style={styles.detailsValue}>
-              {formatScore(entry.scores.overall?.score)}
-            </Text>
-          </View>
-          <View style={styles.detailsRow}>
-            <Text style={styles.detailsLabel}>Voice Score:</Text>
-            <Text style={styles.detailsValue}>
-              {formatScore(entry.scores.voice?.score)}
-            </Text>
-          </View>
-          <View style={styles.detailsRow}>
-            <Text style={styles.detailsLabel}>Data Score:</Text>
-            <Text style={styles.detailsValue}>
-              {formatScore(entry.scores.data?.score)}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.detailsSection}>
           <Text style={styles.detailsSectionTitle}>Voice Metrics</Text>
           <View style={styles.detailsRow}>
             <Text style={styles.detailsLabel}>Attempts:</Text>
@@ -111,18 +89,6 @@ export default function HistoryScreen() {
           <View style={styles.detailsRow}>
             <Text style={styles.detailsLabel}>Dropped:</Text>
             <Text style={styles.detailsValue}>{entry.metrics.voice.dropped}</Text>
-          </View>
-          <View style={styles.detailsRow}>
-            <Text style={styles.detailsLabel}>CSSR:</Text>
-            <Text style={styles.detailsValue}>
-              {formatScore(entry.scores.voice?.cssr)}
-            </Text>
-          </View>
-          <View style={styles.detailsRow}>
-            <Text style={styles.detailsLabel}>CDR:</Text>
-            <Text style={styles.detailsValue}>
-              {formatScore(entry.scores.voice?.cdr)}
-            </Text>
           </View>
           <View style={styles.detailsRow}>
             <Text style={styles.detailsLabel}>Reasons Logged:</Text>

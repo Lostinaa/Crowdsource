@@ -20,7 +20,8 @@ class ListQoeMetrics extends ListRecords
                 ->icon('heroicon-o-document-arrow-down')
                 ->color('success')
                 ->action(function (): StreamedResponse {
-                    $records = QoeMetric::with('user')->latest('timestamp')->get();
+                    $records = clone $this->getFilteredTableQuery();
+                    $records = $records->with('user')->latest('timestamp')->get();
                     $filename = 'qoe_metrics_' . date('Y-m-d_H-i-s') . '.csv';
 
                     return response()->streamDownload(function () use ($records) {

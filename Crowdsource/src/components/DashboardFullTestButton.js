@@ -6,7 +6,9 @@ import {
     TouchableOpacity,
     Animated,
     Easing,
+    ScrollView,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../constants/theme';
 
@@ -72,6 +74,24 @@ export default function DashboardFullTestButton({
         outputRange: ['0deg', '360deg'],
     });
 
+    // Determine the status of each test based on current testLabel
+    const steps = [
+        { key: 'Checking Latency...', title: 'Latency Test' },
+        { key: 'Testing Browsing...', title: 'Browsing Test' },
+        { key: 'Testing Streaming...', title: 'Streaming Test' },
+        { key: 'Measuring Download...', title: 'HTTP Download' },
+        { key: 'Measuring Upload...', title: 'HTTP Upload' },
+        { key: 'Testing FTP DL...', title: 'FTP Download' },
+        { key: 'Testing FTP UL...', title: 'FTP Upload' },
+        { key: 'Testing Social Media...', title: 'Social Media' },
+    ];
+
+    const currentStepIndex = steps.findIndex(s => s.key === testLabel);
+
+    // If Complete! is shown, all are done. If testLabel is "Starting...", none are done.
+    const isComplete = testLabel === 'Complete!';
+    const hasStarted = testLabel !== 'Starting...' && testLabel !== '';
+
     return (
         <View style={styles.container}>
             {/* Outer Pulse Ring */}
@@ -123,6 +143,41 @@ export default function DashboardFullTestButton({
                     </LinearGradient>
                 </TouchableOpacity>
             </Animated.View>
+
+            {/* Checklist UI when testing or completed */}
+            {(isTesting || isComplete) && (
+                <View style={styles.checklistContainer}>
+                    {steps.map((step, index) => {
+                        let status = 'pending';
+                        if (isComplete || (currentStepIndex !== -1 && index < currentStepIndex)) {
+                            status = 'done';
+                        } else if (currentStepIndex === index) {
+                            status = 'running';
+                        } else if (hasStarted === false) {
+                            status = 'pending';
+                        }
+
+                        return (
+                            <View key={step.key} style={styles.checklistItem}>
+                                <View style={styles.iconContainer}>
+                                    {status === 'done' && <MaterialCommunityIcons name="check-circle" size={20} color={theme.colors.success} />}
+                                    {status === 'running' && <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                                        <MaterialCommunityIcons name="loading" size={20} color={theme.colors.primary} />
+                                    </Animated.View>}
+                                    {status === 'pending' && <MaterialCommunityIcons name="circle-outline" size={20} color={theme.colors.border.light} />}
+                                </View>
+                                <Text style={[
+                                    styles.checklistText,
+                                    status === 'done' && styles.checklistTextDone,
+                                    status === 'running' && styles.checklistTextRunning
+                                ]}>
+                                    {step.title}
+                                </Text>
+                            </View>
+                        );
+                    })}
+                </View>
+            )}
         </View>
     );
 }
@@ -190,5 +245,38 @@ const styles = StyleSheet.create({
         borderColor: 'transparent',
         borderTopColor: 'white',
         borderRightColor: 'rgba(255,255,255,0.3)',
+    },
+    checklistContainer: {
+        marginTop: theme.spacing.xl,
+        width: '100%',
+        paddingHorizontal: theme.spacing.xl,
+        backgroundColor: theme.colors.background.card,
+        borderRadius: theme.borderRadius.lg,
+        paddingVertical: theme.spacing.md,
+        ...theme.shadows.sm,
+    },
+    checklistItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: theme.spacing.sm,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: theme.colors.border.light,
+    },
+    iconContainer: {
+        width: 30,
+        alignItems: 'center',
+    },
+    checklistText: {
+        fontSize: 15,
+        color: theme.colors.text.secondary,
+        marginLeft: theme.spacing.sm,
+    },
+    checklistTextRunning: {
+        color: theme.colors.primary,
+        fontWeight: '600',
+    },
+    checklistTextDone: {
+        color: theme.colors.text.primary,
+        fontWeight: '500',
     },
 });

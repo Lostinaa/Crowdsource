@@ -25,7 +25,7 @@ try {
 }
 
 export default function GlobalAutoSync() {
-    const { metrics, scores } = useQoE();
+    const { metrics, scores, triggerSync } = useQoE();
     const metricsRef = useRef(metrics);
     const scoresRef = useRef(scores);
     const isSyncingRef = useRef(false);
@@ -137,6 +137,14 @@ export default function GlobalAutoSync() {
             clearInterval(interval);
         };
     }, [syncOnce]);
+
+    // Listen to manual test triggers
+    useEffect(() => {
+        if (triggerSync > 0) {
+            console.log('[AutoSync] Manual sync triggered by Full Test');
+            syncOnce();
+        }
+    }, [triggerSync, syncOnce]);
 
     // Render nothing — this is a headless component
     return null;

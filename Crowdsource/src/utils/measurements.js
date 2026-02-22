@@ -1,4 +1,18 @@
 import NetInfo from '@react-native-community/netinfo';
+import { FTP_CONFIG } from '../constants/config';
+import * as FileSystem from 'expo-file-system/legacy';
+
+let FTPClient = null;
+const getFTPClient = () => {
+    if (FTPClient) return FTPClient;
+    try {
+        const mod = require('react-native-ftp-client');
+        FTPClient = mod.default || mod;
+    } catch (e) {
+        FTPClient = null;
+    }
+    return FTPClient;
+};
 
 /**
  * Shared measurement utilities for QoE tests.
@@ -294,6 +308,95 @@ export const runSocialTest = async ({ addSocialSample, silent = false }) => {
         return { success: true, duration, throughputKbps };
     } catch (error) {
         console.error('[Measurements] Social test error:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+export const runFtpDownloadTest = async ({ addFtpSample, silent = false }) => {
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) return { success: false, error: 'No Internet' };
+
+    const FTP = getFTPClient();
+    if (!FTP) return { success: false, error: 'FTP not available (requires custom build)' };
+
+    addFtpSample('dl', { request: true });
+
+    try {
+        FTP.setup({
+            ip_address: FTP_CONFIG.host,
+            port: FTP_CONFIG.port,
+            username: FTP_CONFIG.username,
+            password: FTP_CONFIG.password,
+        });
+
+        const localPath = `${FileSystem.cacheDirectory}ftp-download-test.bin`;
+        const cleanLocalPath = localPath.replace('file://', '');
+        const startTime = Date.now();
+
+        const downloadPromise = FTP.downloadFile(cleanLocalPath, FTP_CONFIG.downloadPath);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('FTP timeout')), 15000));
+        await Promise.race([downloadPromise, timeoutPromise]);
+
+        const totalTime = Date.now() - startTime || 1;
+        const info = await FileSystem.getInfoAsync(localPath);
+        const sizeBytes = info?.size || 0;
+
+        if (sizeBytes === 0) throw new Error('Downloaded file is empty');
+
+        const throughputKbps = (sizeBytes * 8 * 1000) / totalTime;
+        const cappedThroughputKbps = Math.min(throughputKbps, 1000 * 1000);
+
+        addFtpSample('dl', { completed: true, throughputKbps: cappedThroughputKbps });
+
+        if (info?.exists) await FileSystem.deleteAsync(localPath, { idempotent: true });
+
+        return { success: true, throughputKbps: cappedThroughputKbps, sizeBytes };
+    } catch (error) {
+        console.error('[Measurements] FTP DL error:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+export const runFtpUploadTest = async ({ addFtpSample, silent = false }) => {
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) return { success: false, error: 'No Internet' };
+
+    const FTP = getFTPClient();
+    if (!FTP) return { success: false, error: 'FTP not available' };
+
+    addFtpSample('ul', { request: true });
+
+    try {
+        FTP.setup({
+            ip_address: FTP_CONFIG.host,
+            port: FTP_CONFIG.port,
+            username: FTP_CONFIG.username,
+            password: FTP_CONFIG.password,
+        });
+
+        const testDataSize = 5 * 1024 * 1024; // 5MB
+        const testData = 'x'.repeat(testDataSize);
+        const localPath = `${FileSystem.cacheDirectory}ftp-upload-test.txt`;
+        const cleanLocalPath = localPath.replace('file://', '');
+
+        await FileSystem.writeAsStringAsync(localPath, testData);
+        const startTime = Date.now();
+
+        const uploadPromise = FTP.uploadFile(cleanLocalPath, FTP_CONFIG.uploadPath);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('FTP timeout')), 15000));
+        await Promise.race([uploadPromise, timeoutPromise]);
+
+        const uploadTime = Date.now() - startTime || 1;
+        const throughputKbps = (testDataSize * 8 * 1000) / uploadTime;
+        const cappedThroughputKbps = Math.min(throughputKbps, 1000 * 1000);
+
+        addFtpSample('ul', { completed: true, throughputKbps: cappedThroughputKbps });
+
+        await FileSystem.deleteAsync(localPath, { idempotent: true });
+
+        return { success: true, throughputKbps: cappedThroughputKbps, sizeBytes: testDataSize };
+    } catch (error) {
+        console.error('[Measurements] FTP UL error:', error);
         return { success: false, error: error.message };
     }
 };
