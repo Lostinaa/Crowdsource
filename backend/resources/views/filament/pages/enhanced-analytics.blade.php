@@ -1,4 +1,9 @@
 <x-filament-panels::page>
+    {{-- Date Range Filter --}}
+    <form wire:submit.prevent="$refresh">
+        {{ $this->form }}
+    </form>
+
     @php
         $voice = $this->getVoiceData();
         $data = $this->getDataAnalytics();
@@ -19,14 +24,16 @@
                     <x-filament::card>
                         <div class="space-y-1">
                             <div class="text-sm font-medium text-gray-500">CSSR</div>
-                            <div class="text-3xl font-bold text-primary-600">{{ number_format($voice['cssr'] ?? 0, 1) }}%</div>
+                            <div class="text-3xl font-bold text-primary-600">
+                                {{ number_format($voice['cssr'] ?? 0, 1) }}%</div>
                             <div class="text-xs text-gray-400">Call Setup Success Ratio</div>
                         </div>
                     </x-filament::card>
                     <x-filament::card>
                         <div class="space-y-1">
                             <div class="text-sm font-medium text-gray-500">CDR</div>
-                            <div class="text-3xl font-bold text-danger-600">{{ number_format($voice['cdr'] ?? 0, 1) }}%</div>
+                            <div class="text-3xl font-bold text-danger-600">{{ number_format($voice['cdr'] ?? 0, 1) }}%
+                            </div>
                             <div class="text-xs text-gray-400">Call Drop Ratio</div>
                         </div>
                     </x-filament::card>
@@ -66,8 +73,12 @@
                             <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-800">
                                     <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Metric</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Value</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
@@ -81,11 +92,13 @@
                                     </tr>
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Total Requests</td>
-                                        <td class="px-4 py-3 whitespace-nowrap">{{ $data['browsing']['total_requests'] ?? 0 }}</td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            {{ $data['browsing']['total_requests'] ?? 0 }}</td>
                                     </tr>
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Completed</td>
-                                        <td class="px-4 py-3 whitespace-nowrap">{{ $data['browsing']['total_completed'] ?? 0 }}</td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            {{ $data['browsing']['total_completed'] ?? 0 }}</td>
                                     </tr>
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Average Duration</td>
@@ -107,8 +120,12 @@
                             <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-800">
                                     <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Metric</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Value</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
@@ -164,8 +181,12 @@
                             <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-800">
                                     <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Metric</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Value</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
@@ -199,7 +220,8 @@
                                     </tr>
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Total Requests</td>
-                                        <td class="px-4 py-3 whitespace-nowrap">{{ $data['http']['download']['total_requests'] ?? 0 }}</td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            {{ $data['http']['download']['total_requests'] ?? 0 }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -215,8 +237,12 @@
                             <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-800">
                                     <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Metric</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Value</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
@@ -250,7 +276,8 @@
                                     </tr>
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Total Requests</td>
-                                        <td class="px-4 py-3 whitespace-nowrap">{{ $data['ftp']['download']['total_requests'] ?? 0 }}</td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            {{ $data['ftp']['download']['total_requests'] ?? 0 }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -266,8 +293,12 @@
                             <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-800">
                                     <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Metric</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Value</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
@@ -295,7 +326,8 @@
                                     </tr>
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Total Requests</td>
-                                        <td class="px-4 py-3 whitespace-nowrap">{{ $data['social']['total_requests'] ?? 0 }}</td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            {{ $data['social']['total_requests'] ?? 0 }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -311,8 +343,12 @@
                             <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-800">
                                     <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Metric</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Value</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
@@ -325,7 +361,8 @@
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td class="px-4 py-3 whitespace-nowrap font-medium">Interactivity Success Ratio</td>
+                                        <td class="px-4 py-3 whitespace-nowrap font-medium">Interactivity Success Ratio
+                                        </td>
                                         <td class="px-4 py-3 whitespace-nowrap">
                                             <span class="font-bold text-primary-600 dark:text-primary-400">
                                                 {{ $data['latency']['interactivity_success_ratio'] !== null ? number_format($data['latency']['interactivity_success_ratio'], 1) . '%' : 'N/A' }}
@@ -342,7 +379,8 @@
                                     </tr>
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Total Requests</td>
-                                        <td class="px-4 py-3 whitespace-nowrap">{{ $data['latency']['total_requests'] ?? 0 }}</td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            {{ $data['latency']['total_requests'] ?? 0 }}</td>
                                     </tr>
                                 </tbody>
                             </table>
