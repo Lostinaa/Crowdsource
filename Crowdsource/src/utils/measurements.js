@@ -337,14 +337,15 @@ export const runFtpDownloadTest = async ({ addFtpSample, silent = false }) => {
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('FTP timeout')), 15000));
         await Promise.race([downloadPromise, timeoutPromise]);
 
-        const totalTime = Date.now() - startTime || 1;
+        const totalTime = Math.max(Date.now() - startTime, 200); // Min 200ms guard
         const info = await FileSystem.getInfoAsync(localPath);
         const sizeBytes = info?.size || 0;
 
         if (sizeBytes === 0) throw new Error('Downloaded file is empty');
 
         const throughputKbps = (sizeBytes * 8 * 1000) / totalTime;
-        const cappedThroughputKbps = Math.min(throughputKbps, 1000 * 1000);
+        // Cap at 100 Mbps — anything higher on mobile is a bad reading from instant FTP resolve
+        const cappedThroughputKbps = Math.min(throughputKbps, 100 * 1000);
 
         addFtpSample('dl', { completed: true, throughputKbps: cappedThroughputKbps });
 
@@ -386,9 +387,10 @@ export const runFtpUploadTest = async ({ addFtpSample, silent = false }) => {
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('FTP timeout')), 15000));
         await Promise.race([uploadPromise, timeoutPromise]);
 
-        const uploadTime = Date.now() - startTime || 1;
+        const uploadTime = Math.max(Date.now() - startTime, 200); // Min 200ms guard
         const throughputKbps = (testDataSize * 8 * 1000) / uploadTime;
-        const cappedThroughputKbps = Math.min(throughputKbps, 1000 * 1000);
+        // Cap at 100 Mbps — anything higher on mobile is a bad reading
+        const cappedThroughputKbps = Math.min(throughputKbps, 100 * 1000);
 
         addFtpSample('ul', { completed: true, throughputKbps: cappedThroughputKbps });
 
