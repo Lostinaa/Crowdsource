@@ -518,6 +518,7 @@ export const QoEProvider = ({ children }) => {
           addLatencySample,
           addHttpSample,
           addSocialSample,
+          addFtpSample,
           silent: true
         });
         setTestProgress((i + 1) / tests.length);

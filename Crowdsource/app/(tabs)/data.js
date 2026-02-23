@@ -5,6 +5,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
 import * as Measurements from '../../src/utils/measurements';
+import ScreenHeader from '../../src/components/ScreenHeader';
+import BrandedButton from '../../src/components/BrandedButton';
 
 export default function DataScreen() {
   const {
@@ -136,7 +138,7 @@ export default function DataScreen() {
         <View style={styles.heroSection}>
           <BrandedButton
             title={isTesting ? "Testing in progress..." : "▶  Run Full Test"}
-            onPress={fulltest}
+            onPress={runFullTest}
             disabled={isTesting}
             loading={isTesting}
           />
