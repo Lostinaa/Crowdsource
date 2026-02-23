@@ -182,13 +182,15 @@ class AnalyticsController extends Controller
         $httpUlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['http']['ul']['completed'] ?? 0);
         $httpUlThroughputs = $this->getAllValuesFromNested($metrics, 'data.http.ul.throughputs');
 
-        // FTP analytics
+        // FTP analytics (throughputs stored as Kbps, convert to Mbps for consistency with HTTP)
         $ftpDlRequests = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['dl']['requests'] ?? 0);
         $ftpDlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['dl']['completed'] ?? 0);
-        $ftpDlThroughputs = $this->getAllValuesFromNested($metrics, 'data.ftp.dl.throughputs');
+        $ftpDlThroughputs = $this->getAllValuesFromNested($metrics, 'data.ftp.dl.throughputs')
+            ->map(fn($v) => $v / 1000); // Kbps → Mbps
         $ftpUlRequests = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['ul']['requests'] ?? 0);
         $ftpUlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['ul']['completed'] ?? 0);
-        $ftpUlThroughputs = $this->getAllValuesFromNested($metrics, 'data.ftp.ul.throughputs');
+        $ftpUlThroughputs = $this->getAllValuesFromNested($metrics, 'data.ftp.ul.throughputs')
+            ->map(fn($v) => $v / 1000); // Kbps → Mbps
 
         // Social analytics
         $socialRequests = $metrics->sum(fn($m) => $m->metrics['data']['social']['requests'] ?? 0);
