@@ -110,16 +110,16 @@ class AnalyticsController extends Controller
         });
 
         // Get all MOS samples and setup times for threshold calculations
-        $allMosSamples = $this->getAllValuesFromNested($metrics, 'metrics.voice.mosSamples');
-        $allSetupTimes = $this->getAllValuesFromNested($metrics, 'metrics.voice.setupTimes');
+        $allMosSamples = $this->getAllValuesFromNested($metrics, 'voice.mosSamples');
+        $allSetupTimes = $this->getAllValuesFromNested($metrics, 'voice.setupTimes');
 
         $voiceData = [
             'total_attempts' => $totalAttempts,
             'total_completed' => $totalCompleted,
             'total_dropped' => $totalDropped,
             'total_setup_ok' => $totalSetupOk,
-            'average_setup_time' => $this->calculateAverageFromNested($metrics, 'metrics.voice.setupTimes'),
-            'average_mos' => $this->calculateAverageFromNested($metrics, 'metrics.voice.mosSamples'),
+            'average_setup_time' => $this->calculateAverageFromNested($metrics, 'voice.setupTimes'),
+            'average_mos' => $this->calculateAverageFromNested($metrics, 'voice.mosSamples'),
             'cssr' => $totalAttempts > 0 ? ($totalSetupOk / $totalAttempts) * 100 : null, // Percentage
             'cdr' => ($totalCompleted + $totalDropped) > 0 ? ($totalDropped / ($totalCompleted + $totalDropped)) * 100 : null, // Percentage
             // Threshold-based metrics
@@ -164,41 +164,41 @@ class AnalyticsController extends Controller
         // Browsing analytics
         $browsingRequests = $metrics->sum(fn($m) => $m->metrics['data']['browsing']['requests'] ?? 0);
         $browsingCompleted = $metrics->sum(fn($m) => $m->metrics['data']['browsing']['completed'] ?? 0);
-        $browsingDurations = $this->getAllValuesFromNested($metrics, 'metrics.data.browsing.durations');
+        $browsingDurations = $this->getAllValuesFromNested($metrics, 'data.browsing.durations');
 
         // Streaming analytics
         $streamingRequests = $metrics->sum(fn($m) => $m->metrics['data']['streaming']['requests'] ?? 0);
         $streamingCompleted = $metrics->sum(fn($m) => $m->metrics['data']['streaming']['completed'] ?? 0);
-        $streamingMosSamples = $this->getAllValuesFromNested($metrics, 'metrics.data.streaming.mosSamples');
-        $streamingSetupTimes = $this->getAllValuesFromNested($metrics, 'metrics.data.streaming.setupTimes');
+        $streamingMosSamples = $this->getAllValuesFromNested($metrics, 'data.streaming.mosSamples');
+        $streamingSetupTimes = $this->getAllValuesFromNested($metrics, 'data.streaming.setupTimes');
 
         // HTTP Download analytics
         $httpDlRequests = $metrics->sum(fn($m) => $m->metrics['data']['http']['dl']['requests'] ?? 0);
         $httpDlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['http']['dl']['completed'] ?? 0);
-        $httpDlThroughputs = $this->getAllValuesFromNested($metrics, 'metrics.data.http.dl.throughputs');
+        $httpDlThroughputs = $this->getAllValuesFromNested($metrics, 'data.http.dl.throughputs');
 
         // HTTP Upload analytics
         $httpUlRequests = $metrics->sum(fn($m) => $m->metrics['data']['http']['ul']['requests'] ?? 0);
         $httpUlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['http']['ul']['completed'] ?? 0);
-        $httpUlThroughputs = $this->getAllValuesFromNested($metrics, 'metrics.data.http.ul.throughputs');
+        $httpUlThroughputs = $this->getAllValuesFromNested($metrics, 'data.http.ul.throughputs');
 
         // FTP analytics
         $ftpDlRequests = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['dl']['requests'] ?? 0);
         $ftpDlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['dl']['completed'] ?? 0);
-        $ftpDlThroughputs = $this->getAllValuesFromNested($metrics, 'metrics.data.ftp.dl.throughputs');
+        $ftpDlThroughputs = $this->getAllValuesFromNested($metrics, 'data.ftp.dl.throughputs');
         $ftpUlRequests = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['ul']['requests'] ?? 0);
         $ftpUlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['ul']['completed'] ?? 0);
-        $ftpUlThroughputs = $this->getAllValuesFromNested($metrics, 'metrics.data.ftp.ul.throughputs');
+        $ftpUlThroughputs = $this->getAllValuesFromNested($metrics, 'data.ftp.ul.throughputs');
 
         // Social analytics
         $socialRequests = $metrics->sum(fn($m) => $m->metrics['data']['social']['requests'] ?? 0);
         $socialCompleted = $metrics->sum(fn($m) => $m->metrics['data']['social']['completed'] ?? 0);
-        $socialDurations = $this->getAllValuesFromNested($metrics, 'metrics.data.social.durations');
+        $socialDurations = $this->getAllValuesFromNested($metrics, 'data.social.durations');
 
         // Latency analytics
         $latencyRequests = $metrics->sum(fn($m) => $m->metrics['data']['latency']['requests'] ?? 0);
         $latencyCompleted = $metrics->sum(fn($m) => $m->metrics['data']['latency']['completed'] ?? 0);
-        $latencyScores = $this->getAllValuesFromNested($metrics, 'metrics.data.latency.scores');
+        $latencyScores = $this->getAllValuesFromNested($metrics, 'data.latency.scores');
 
         $dataAnalytics = [
             'browsing' => [
