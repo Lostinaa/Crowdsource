@@ -58,7 +58,7 @@ export const APP_CONFIG = {
 
 // Backend API
 export const BACKEND_CONFIG = {
-  url: getEnvVar('EXPO_PUBLIC_BACKEND_URL', 'http://196.189.124.237:9996/api'),
+  url: getEnvVar('EXPO_PUBLIC_BACKEND_URL', 'https://crowdsource.ethiotelecom.et/api'),
 };
 
 
