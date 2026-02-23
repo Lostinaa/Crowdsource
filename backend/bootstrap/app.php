@@ -12,10 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Trust all proxies so Nginx SSL termination is respected.
-        // This ensures Laravel generates https:// asset URLs when behind
-        // a reverse proxy, preventing mixed-content errors in the browser.
-        $middleware->trustProxies(at: '*');
+        //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
