@@ -18,6 +18,15 @@ class EnhancedAnalyticsWidget extends Widget
 
     protected int|string|array $columnSpan = 'full';
 
+    /**
+     * Hide this widget from the main Dashboard.
+     * The Enhanced Analytics data is shown on its own sidebar page instead.
+     */
+    public static function canView(): bool
+    {
+        return false;
+    }
+
     public function getVoiceData(): array
     {
         $startDate = $this->filters['startDate'] ?? Carbon::today()->toDateString();
