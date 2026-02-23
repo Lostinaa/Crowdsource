@@ -132,6 +132,24 @@ class DeviceDiagnosticModule : Module() {
                         data["pci"] = formatValue(id.pci)
                     }
                 }
+                is CellInfoWcdma -> {
+                    val id = registeredInfo.cellIdentity
+                    data["netType"] = "3G WCDMA"
+                    data["cellId"] = formatValue(id.cid)   // WCDMA Cell ID (0–268435455)
+                    data["enb"] = formatValue(id.rnc)      // RNC identifier
+                    data["eci"] = formatValue(id.cid)
+                    data["tac"] = "---"                    // WCDMA uses LAC, not TAC
+                    data["pci"] = formatValue(id.psc)      // Primary Scrambling Code
+                }
+                is CellInfoGsm -> {
+                    val id = registeredInfo.cellIdentity
+                    data["netType"] = "2G GSM"
+                    data["cellId"] = formatValue(id.cid)   // GSM Cell ID (0–65535)
+                    data["enb"] = "---"
+                    data["eci"] = formatValue(id.cid)
+                    data["tac"] = "---"                    // GSM uses LAC, not TAC
+                    data["pci"] = "---"                    // No PCI in GSM
+                }
             }
         } catch (exception: Exception) {
             data["netType"] = "Access Denied"
@@ -158,6 +176,20 @@ class DeviceDiagnosticModule : Module() {
                 numbers[0] = formatValue(signal.ssRsrp)
                 numbers[1] = formatValue(signal.ssRsrq)
                 numbers[2] = formatValue(signal.csiSinr)
+                numbers[3] = "---"
+            }
+            is CellInfoWcdma -> {
+                val signal = cellInfo.cellSignalStrength
+                numbers[0] = formatValue(signal.dbm)   // RSCP in dBm (closest to RSRP for WCDMA)
+                numbers[1] = "---"
+                numbers[2] = "---"
+                numbers[3] = "---"
+            }
+            is CellInfoGsm -> {
+                val signal = cellInfo.cellSignalStrength
+                numbers[0] = formatValue(signal.dbm)   // RSSI in dBm
+                numbers[1] = "---"
+                numbers[2] = "---"
                 numbers[3] = "---"
             }
         }
