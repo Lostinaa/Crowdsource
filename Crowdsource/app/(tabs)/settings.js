@@ -45,12 +45,12 @@ export default function SettingsScreen() {
           setAutoSync(true);
         }
 
-        // If explicit preference exists, use it. Otherwise default to FALSE for push.
+        // If explicit preference exists, use it. Otherwise default to TRUE for push.
         if (push !== null) {
           setPushEnabled(push === 'true');
         } else {
-          // First run: Default to FALSE
-          setPushEnabled(false);
+          // First run: Default to TRUE
+          setPushEnabled(true);
         }
       } catch (error) {
         console.error('[Settings] Failed to load settings:', error);

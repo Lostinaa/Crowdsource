@@ -135,10 +135,10 @@ class DeviceDiagnosticModule : Module() {
                 is CellInfoWcdma -> {
                     val id = registeredInfo.cellIdentity
                     data["netType"] = "3G WCDMA"
-                    data["cellId"] = formatValue(id.cid)   // WCDMA Cell ID (0–268435455)
-                    data["enb"] = formatValue(id.rnc)      // RNC identifier
+                    data["cellId"] = if (id.cid != Int.MAX_VALUE && id.cid > 0) (id.cid % 65536).toString() else "---"
+                    data["enb"] = if (id.cid != Int.MAX_VALUE && id.cid > 0) (id.cid / 65536).toString() else "---"  // RNC derived from UCID
                     data["eci"] = formatValue(id.cid)
-                    data["tac"] = "---"                    // WCDMA uses LAC, not TAC
+                    data["tac"] = formatValue(id.lac)      // WCDMA uses LAC
                     data["pci"] = formatValue(id.psc)      // Primary Scrambling Code
                 }
                 is CellInfoGsm -> {

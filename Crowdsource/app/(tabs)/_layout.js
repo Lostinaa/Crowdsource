@@ -17,13 +17,16 @@ export default function TabsLayout() {
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.1,
           shadowRadius: 4,
-          height: 75,
-          paddingBottom: 20,
-          paddingTop: 5,
+          height: 65,
+          paddingBottom: 10,
+          paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontWeight: '600',
-          fontSize: 10,
+          fontSize: 11,
+        },
+        tabBarIconStyle: {
+          marginBottom: 2,
         },
       }}
     >
@@ -67,10 +70,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="notifications"
         options={{
-          title: 'Alerts',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications-outline" size={size} color={color} />
-          ),
+          href: null, // Hidden from tabs
         }}
       />
 
