@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -20,6 +21,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Force HTTPS in production (behind reverse proxy)
+        if (str_starts_with(config('app.url'), 'https')) {
+            URL::forceScheme('https');
+        }
         // Schedule data retention enforcement (run daily at 2 AM)
         $this->app->booted(function () {
             $schedule = $this->app->make(Schedule::class);
