@@ -450,28 +450,56 @@ export default function VoiceScreen() {
         <View style={styles.metricsBox}>
           <Text style={styles.sectionTitle}>Voice Metrics</Text>
 
+          {/* Raw Call Counts — clearly show dynamic updates */}
+          <View style={styles.countersRow}>
+            <View style={styles.counterItem}>
+              <Text style={styles.counterValue}>{metrics.voice.attempts}</Text>
+              <Text style={styles.counterLabel}>Attempts</Text>
+            </View>
+            <View style={styles.counterItem}>
+              <Text style={styles.counterValue}>{metrics.voice.setupOk}</Text>
+              <Text style={styles.counterLabel}>Connected</Text>
+            </View>
+            <View style={styles.counterItem}>
+              <Text style={[styles.counterValue, { color: theme.colors.success }]}>{metrics.voice.completed}</Text>
+              <Text style={styles.counterLabel}>Completed</Text>
+            </View>
+            <View style={styles.counterItem}>
+              <Text style={[styles.counterValue, { color: metrics.voice.dropped > 0 ? theme.colors.danger : theme.colors.text.primary }]}>{metrics.voice.dropped}</Text>
+              <Text style={styles.counterLabel}>Dropped</Text>
+            </View>
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* KPI Ratios */}
           <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Call Setup Success Rate (CSSR)</Text>
+            <Text style={styles.metricLabel}>CSSR</Text>
             <Text style={styles.metricValue}>
               {formatPercent(scores.voice.cssr)}
             </Text>
           </View>
 
           <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Call Drop Rate (CDR)</Text>
-            <Text style={styles.metricValue}>
+            <Text style={styles.metricLabel}>CDR</Text>
+            <Text style={[styles.metricValue, scores.voice.cdr > 0 && { color: theme.colors.danger }]}>
               {formatPercent(scores.voice.cdr)}
             </Text>
           </View>
 
           <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Avg Call Setup Time</Text>
+            <Text style={styles.metricLabel}>Avg Setup Time</Text>
             <Text style={styles.metricValue}>
               {formatTime(scores.voice.cstAvg)}
             </Text>
           </View>
 
-
+          <View style={styles.metricRow}>
+            <Text style={styles.metricLabel}>Estimated MOS</Text>
+            <Text style={styles.metricValue}>
+              {signalMos > 0 ? formatMOS(signalMos) : (scores.voice.mosAvg !== null && scores.voice.mosAvg !== undefined ? formatMOS(scores.voice.mosAvg) : '--')}
+            </Text>
+          </View>
 
         </View>
 
@@ -589,6 +617,25 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: theme.colors.border.light,
     marginVertical: theme.spacing.sm,
+  },
+  countersRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: theme.spacing.sm,
+  },
+  counterItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  counterValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+  },
+  counterLabel: {
+    fontSize: 11,
+    color: theme.colors.text.secondary,
+    marginTop: 2,
   },
   noteText: {
     color: theme.colors.text.light,
