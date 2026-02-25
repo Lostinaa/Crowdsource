@@ -337,15 +337,19 @@ export const runFtpDownloadTest = async ({ addFtpSample, silent = false }) => {
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('FTP timeout')), 15000));
         await Promise.race([downloadPromise, timeoutPromise]);
 
-        const totalTime = Math.max(Date.now() - startTime, 200); // Min 200ms guard
+        const totalTime = Date.now() - startTime;
         const info = await FileSystem.getInfoAsync(localPath);
         const sizeBytes = info?.size || 0;
 
         if (sizeBytes === 0) throw new Error('Downloaded file is empty');
 
-        const throughputKbps = (sizeBytes * 8 * 1000) / totalTime;
-        // Cap at 100 Mbps — anything higher on mobile is a bad reading from instant FTP resolve
-        const cappedThroughputKbps = Math.min(throughputKbps, 100 * 1000);
+        console.log(`[FTP DL] File: ${sizeBytes} bytes in ${totalTime}ms`);
+
+        // Use actual time but enforce a minimum of 1s to avoid unrealistically fast FTP resolves
+        const effectiveTime = Math.max(totalTime, 1000);
+        const throughputKbps = (sizeBytes * 8 * 1000) / effectiveTime;
+        // Cap at 50 Mbps — realistic mobile FTP ceiling
+        const cappedThroughputKbps = Math.min(throughputKbps, 50 * 1000);
 
         addFtpSample('dl', { completed: true, throughputKbps: cappedThroughputKbps });
 
@@ -387,10 +391,15 @@ export const runFtpUploadTest = async ({ addFtpSample, silent = false }) => {
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('FTP timeout')), 15000));
         await Promise.race([uploadPromise, timeoutPromise]);
 
-        const uploadTime = Math.max(Date.now() - startTime, 200); // Min 200ms guard
-        const throughputKbps = (testDataSize * 8 * 1000) / uploadTime;
-        // Cap at 100 Mbps — anything higher on mobile is a bad reading
-        const cappedThroughputKbps = Math.min(throughputKbps, 100 * 1000);
+        const uploadTime = Date.now() - startTime;
+
+        console.log(`[FTP UL] File: ${testDataSize} bytes in ${uploadTime}ms`);
+
+        // Use actual time but enforce a minimum of 1s to avoid unrealistically fast FTP resolves
+        const effectiveTime = Math.max(uploadTime, 1000);
+        const throughputKbps = (testDataSize * 8 * 1000) / effectiveTime;
+        // Cap at 50 Mbps — realistic mobile FTP ceiling
+        const cappedThroughputKbps = Math.min(throughputKbps, 50 * 1000);
 
         addFtpSample('ul', { completed: true, throughputKbps: cappedThroughputKbps });
 

@@ -17,7 +17,6 @@ const BROWSING_URLS = [
   'https://www.wikipedia.org/',
 ];
 
-const YOUTUBE_URL = 'https://www.youtube.com/watch?v=aJq936yAUbc';
 const CHROME_USER_AGENT = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
 
 export default function DataScreen() {
@@ -44,8 +43,11 @@ export default function DataScreen() {
   const [webViewUrl, setWebViewUrl] = useState('');
   const [webViewLabel, setWebViewLabel] = useState('');
   const [webViewType, setWebViewType] = useState(null); // 'browsing' | 'streaming'
+  const [webViewKey, setWebViewKey] = useState(0);
   const browsingStartRef = useRef(null);
   const browsingIndexRef = useRef(0);
+  const loadedRef = useRef(false);
+  const streamTimerRef = useRef(null);
 
   // Sync local isTesting with context isTesting for full test
   useEffect(() => {
@@ -84,12 +86,14 @@ export default function DataScreen() {
     if (isTesting) return;
     setIsTesting(true);
     browsingIndexRef.current = 0;
+    loadedRef.current = false;
 
     addBrowsingSample({ request: true });
     browsingStartRef.current = Date.now();
     setWebViewType('browsing');
-    setWebViewLabel(`Loading ${BROWSING_URLS[0]}...`);
+    setWebViewLabel(`Loading ${BROWSING_URLS[0]}... (1/${BROWSING_URLS.length})`);
     setWebViewUrl(BROWSING_URLS[0]);
+    setWebViewKey(k => k + 1);
     setWebViewVisible(true);
   }, [isTesting, addBrowsingSample]);
 
@@ -109,10 +113,12 @@ export default function DataScreen() {
     const nextIdx = idx + 1;
     if (nextIdx < BROWSING_URLS.length) {
       browsingIndexRef.current = nextIdx;
+      loadedRef.current = false;
       addBrowsingSample({ request: true });
       browsingStartRef.current = Date.now();
       setWebViewLabel(`Loading ${BROWSING_URLS[nextIdx]}... (${nextIdx + 1}/${BROWSING_URLS.length})`);
       setWebViewUrl(BROWSING_URLS[nextIdx]);
+      setWebViewKey(k => k + 1);
     } else {
       setWebViewVisible(false);
       setWebViewType(null);
@@ -122,31 +128,40 @@ export default function DataScreen() {
   }, [addBrowsingSample]);
 
   const onBrowsingLoadEnd = useCallback(() => {
-    moveToNextBrowsingSite(true);
+    // Prevent duplicate fires from redirects
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    const idx = browsingIndexRef.current;
+    setWebViewLabel(`Loaded ${BROWSING_URLS[idx]} ✓ (${idx + 1}/${BROWSING_URLS.length})`);
+    // Show page for 2 seconds before moving to next
+    setTimeout(() => moveToNextBrowsingSite(true), 2000);
   }, [moveToNextBrowsingSite]);
 
   const onBrowsingError = useCallback((syntheticEvent) => {
     const { nativeEvent } = syntheticEvent;
     console.warn('[Data] WebView error:', nativeEvent.description);
-    // Skip failed site and move to next
-    moveToNextBrowsingSite(false);
+    const idx = browsingIndexRef.current;
+    setWebViewLabel(`⚠ ${BROWSING_URLS[idx]} failed, skipping...`);
+    setTimeout(() => moveToNextBrowsingSite(false), 1000);
   }, [moveToNextBrowsingSite]);
 
   // ── WebView-based Streaming Test ────────────────────────────────────
   const testStreamingWebView = useCallback(() => {
     if (isTesting) return;
     setIsTesting(true);
+    loadedRef.current = false;
     addStreamingSample({ request: true });
     browsingStartRef.current = Date.now();
     setWebViewType('streaming');
     setWebViewLabel('Loading YouTube video...');
-    setWebViewUrl(YOUTUBE_URL);
+    setWebViewUrl('https://m.youtube.com/watch?v=aJq936yAUbc');
+    setWebViewKey(k => k + 1);
     setWebViewVisible(true);
 
-    // Auto-close after 15 seconds (video duration)
-    setTimeout(() => {
+    // Auto-close after 20 seconds
+    streamTimerRef.current = setTimeout(() => {
       const setupTime = Date.now() - (browsingStartRef.current || Date.now());
-      const throughputKbps = 4000; // Estimate from video playback
+      const throughputKbps = 4000;
       const mos = throughputKbps > 8000 ? 4.5 : throughputKbps > 4000 ? 4.0 : throughputKbps > 2000 ? 3.5 : throughputKbps > 500 ? 3.0 : 2.5;
       addStreamingSample({
         request: false,
@@ -161,16 +176,22 @@ export default function DataScreen() {
       setWebViewType(null);
       setIsTesting(false);
       Alert.alert('Streaming Test Complete', `MOS: ${mos.toFixed(1)}, Resolution: HD (720p)`);
-    }, 15000);
+    }, 20000);
   }, [isTesting, addStreamingSample]);
 
   const onStreamingLoadEnd = useCallback(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     const setupTime = Date.now() - (browsingStartRef.current || Date.now());
     setWebViewLabel(`Playing video... (setup: ${(setupTime / 1000).toFixed(1)}s)`);
     addStreamingSample({ request: false, setupTimeMs: setupTime });
   }, [addStreamingSample]);
 
   const closeWebView = useCallback(() => {
+    if (streamTimerRef.current) {
+      clearTimeout(streamTimerRef.current);
+      streamTimerRef.current = null;
+    }
     setWebViewVisible(false);
     setWebViewType(null);
     setIsTesting(false);
@@ -347,7 +368,7 @@ export default function DataScreen() {
           </View>
           {webViewUrl ? (
             <WebView
-              key={webViewUrl}
+              key={webViewKey}
               source={{ uri: webViewUrl }}
               style={styles.webView}
               userAgent={CHROME_USER_AGENT}

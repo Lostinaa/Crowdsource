@@ -198,7 +198,7 @@ class QoeMetricResource extends Resource
                     ->default('Anonymous'),
 
                 Tables\Columns\TextColumn::make('timestamp')
-                    ->dateTime()
+                    ->dateTime('M d, Y h:i A')
                     ->sortable()
                     ->searchable(),
 
@@ -278,7 +278,7 @@ class QoeMetricResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
+                    ->dateTime('M d, Y h:i A')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
