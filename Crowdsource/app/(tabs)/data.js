@@ -17,7 +17,8 @@ const BROWSING_URLS = [
   'https://www.wikipedia.org/',
 ];
 
-const YOUTUBE_EMBED_URL = 'https://www.youtube.com/embed/aJq936yAUbc?autoplay=1&controls=1';
+const YOUTUBE_URL = 'https://www.youtube.com/watch?v=aJq936yAUbc';
+const CHROME_USER_AGENT = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
 
 export default function DataScreen() {
   const {
@@ -92,34 +93,44 @@ export default function DataScreen() {
     setWebViewVisible(true);
   }, [isTesting, addBrowsingSample]);
 
-  const onBrowsingLoadEnd = useCallback(() => {
+  const moveToNextBrowsingSite = useCallback((completed = true) => {
     const duration = Date.now() - (browsingStartRef.current || Date.now());
     const idx = browsingIndexRef.current;
-    const url = BROWSING_URLS[idx];
 
-    addBrowsingSample({
-      completed: true,
-      durationMs: duration,
-      dnsResolutionTimeMs: Math.min(duration, 500),
-      throughputKbps: 0,
-    });
+    if (completed) {
+      addBrowsingSample({
+        completed: true,
+        durationMs: duration,
+        dnsResolutionTimeMs: Math.min(duration, 500),
+        throughputKbps: 0,
+      });
+    }
 
     const nextIdx = idx + 1;
     if (nextIdx < BROWSING_URLS.length) {
-      // Move to next site
       browsingIndexRef.current = nextIdx;
       addBrowsingSample({ request: true });
       browsingStartRef.current = Date.now();
       setWebViewLabel(`Loading ${BROWSING_URLS[nextIdx]}... (${nextIdx + 1}/${BROWSING_URLS.length})`);
       setWebViewUrl(BROWSING_URLS[nextIdx]);
     } else {
-      // All done
       setWebViewVisible(false);
       setWebViewType(null);
       setIsTesting(false);
-      Alert.alert('Browsing Test Complete', `Tested ${BROWSING_URLS.length} sites successfully.`);
+      Alert.alert('Browsing Test Complete', `Tested ${BROWSING_URLS.length} sites.`);
     }
   }, [addBrowsingSample]);
+
+  const onBrowsingLoadEnd = useCallback(() => {
+    moveToNextBrowsingSite(true);
+  }, [moveToNextBrowsingSite]);
+
+  const onBrowsingError = useCallback((syntheticEvent) => {
+    const { nativeEvent } = syntheticEvent;
+    console.warn('[Data] WebView error:', nativeEvent.description);
+    // Skip failed site and move to next
+    moveToNextBrowsingSite(false);
+  }, [moveToNextBrowsingSite]);
 
   // ── WebView-based Streaming Test ────────────────────────────────────
   const testStreamingWebView = useCallback(() => {
@@ -129,7 +140,7 @@ export default function DataScreen() {
     browsingStartRef.current = Date.now();
     setWebViewType('streaming');
     setWebViewLabel('Loading YouTube video...');
-    setWebViewUrl(YOUTUBE_EMBED_URL);
+    setWebViewUrl(YOUTUBE_URL);
     setWebViewVisible(true);
 
     // Auto-close after 15 seconds (video duration)
@@ -336,12 +347,17 @@ export default function DataScreen() {
           </View>
           {webViewUrl ? (
             <WebView
+              key={webViewUrl}
               source={{ uri: webViewUrl }}
               style={styles.webView}
+              userAgent={CHROME_USER_AGENT}
               onLoadEnd={webViewType === 'browsing' ? onBrowsingLoadEnd : onStreamingLoadEnd}
+              onError={webViewType === 'browsing' ? onBrowsingError : undefined}
               javaScriptEnabled={true}
+              domStorageEnabled={true}
               mediaPlaybackRequiresUserAction={false}
               allowsInlineMediaPlayback={true}
+              allowsFullscreenVideo={true}
               startInLoadingState={true}
               renderLoading={() => (
                 <View style={styles.webViewLoading}>
