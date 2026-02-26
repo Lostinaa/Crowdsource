@@ -329,8 +329,13 @@ export const runFtpDownloadTest = async ({ addFtpSample, silent = false }) => {
             password: FTP_CONFIG.password,
         });
 
-        const localPath = `${FileSystem.cacheDirectory}ftp-download-test.bin`;
+        // Use unique filename to avoid native crash when file already exists
+        const localPath = `${FileSystem.cacheDirectory}ftp-dl-${Date.now()}.bin`;
         const cleanLocalPath = localPath.replace('file://', '');
+
+        // Safety: delete any leftover file before download (native module throws Error if file exists)
+        try { await FileSystem.deleteAsync(localPath, { idempotent: true }); } catch (e) { /* ignore */ }
+
         const startTime = Date.now();
 
         const downloadPromise = FTP.downloadFile(cleanLocalPath, FTP_CONFIG.downloadPath);
@@ -353,7 +358,8 @@ export const runFtpDownloadTest = async ({ addFtpSample, silent = false }) => {
 
         addFtpSample('dl', { completed: true, throughputKbps: cappedThroughputKbps });
 
-        if (info?.exists) await FileSystem.deleteAsync(localPath, { idempotent: true });
+        // Cleanup downloaded file
+        try { await FileSystem.deleteAsync(localPath, { idempotent: true }); } catch (e) { /* ignore */ }
 
         return { success: true, throughputKbps: cappedThroughputKbps, sizeBytes };
     } catch (error) {
@@ -381,8 +387,11 @@ export const runFtpUploadTest = async ({ addFtpSample, silent = false }) => {
 
         const testDataSize = 5 * 1024 * 1024; // 5MB
         const testData = 'x'.repeat(testDataSize);
-        const localPath = `${FileSystem.cacheDirectory}ftp-upload-test.txt`;
+        const localPath = `${FileSystem.cacheDirectory}ftp-ul-${Date.now()}.txt`;
         const cleanLocalPath = localPath.replace('file://', '');
+
+        // Delete any leftover file first
+        try { await FileSystem.deleteAsync(localPath, { idempotent: true }); } catch (e) { /* ignore */ }
 
         await FileSystem.writeAsStringAsync(localPath, testData);
         const startTime = Date.now();
@@ -403,7 +412,7 @@ export const runFtpUploadTest = async ({ addFtpSample, silent = false }) => {
 
         addFtpSample('ul', { completed: true, throughputKbps: cappedThroughputKbps });
 
-        await FileSystem.deleteAsync(localPath, { idempotent: true });
+        try { await FileSystem.deleteAsync(localPath, { idempotent: true }); } catch (e) { /* ignore */ }
 
         return { success: true, throughputKbps: cappedThroughputKbps, sizeBytes: testDataSize };
     } catch (error) {
