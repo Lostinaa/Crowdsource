@@ -53,27 +53,25 @@ class CallDropBridgeModule : Module() {
         }
 
         /**
-         * Check if the app already holds the call companion role.
-         * On API < 29 (no RoleManager), returns false.
+         * Check if the app already holds the dialer role (required for InCallService binding).
          */
         Function("isCallRoleHeld") {
             val context = appContext.reactContext ?: return@Function false
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val roleManager = context.getSystemService(Context.ROLE_SERVICE) as? RoleManager
-                roleManager?.isRoleHeld(RoleManager.ROLE_CALL_SCREENING) ?: false
+                roleManager?.isRoleHeld(RoleManager.ROLE_DIALER) ?: false
             } else {
-                // On older APIs, check if the app is the default dialer
                 val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
                 telecomManager?.defaultDialerPackage == context.packageName
             }
         }
 
         /**
-         * Request the call companion role from the user.
-         * This shows a system dialog: "Allow teleCrowd to manage calls?"
-         * Returns true if role was already held or request was initiated.
-         * The actual result comes via Activity result callback.
+         * Request the default dialer role from the user.
+         * This shows a system dialog: "Set teleCrowd as your default phone app?"
+         * The app won't replace the dialer UI — our service has IN_CALL_SERVICE_UI=false.
+         * But Android requires this role for InCallService binding.
          */
         AsyncFunction("requestCallRole") {
             val context = appContext.reactContext ?: return@AsyncFunction false
@@ -83,20 +81,18 @@ class CallDropBridgeModule : Module() {
                 val roleManager = context.getSystemService(Context.ROLE_SERVICE) as? RoleManager
                     ?: return@AsyncFunction false
 
-                if (roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)) {
-                    Log.d(TAG, "Call screening role already held")
+                if (roleManager.isRoleHeld(RoleManager.ROLE_DIALER)) {
+                    Log.d(TAG, "Dialer role already held")
                     return@AsyncFunction true
                 }
 
-                // Try companion role first (doesn't replace dialer)
-                val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING)
+                val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
                 try {
                     activity.startActivityForResult(intent, 9001)
-                    Log.d(TAG, "Requested call screening role")
+                    Log.d(TAG, "Requested dialer role")
                     true
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to request role: ${e.message}")
-                    // Fallback: try to offer as default dialer
+                    Log.e(TAG, "Failed to request dialer role: ${e.message}")
                     tryOfferDefaultDialer(context)
                 }
             } else {
