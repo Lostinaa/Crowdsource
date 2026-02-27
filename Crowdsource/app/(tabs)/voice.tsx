@@ -19,6 +19,14 @@ try {
   console.warn('[Voice] DeviceDiagnosticModule not available');
 }
 
+// Try to get InCallService bridge for real DisconnectCause
+let CallDropBridgeModule: any = null;
+try {
+  CallDropBridgeModule = requireNativeModule('CallDropBridgeModule');
+} catch (e) {
+  console.warn('[Voice] CallDropBridgeModule not available — will use CallLog fallback');
+}
+
 
 export default function VoiceScreen() {
   const { addVoiceSample, metrics, scores } = useQoE();
@@ -96,15 +104,18 @@ export default function VoiceScreen() {
     return value.toFixed(2);
   };
 
-  // ── Enhanced Call Drop Detection ──────────────────────────────────────
-  // Combines signal strength + call duration + CallLog metadata
-  // instead of just a 3-second time threshold.
+  // ── Call Drop Detection ──────────────────────────────────────────────
+  // A "dropped call" = both parties were connected and talking, then the
+  // call ended WITHOUT either party pressing hangup (e.g. network failure).
+  // Since Android's CallLog can't distinguish "user hung up" from
+  // "network dropped", we default to COMPLETED and only mark DROPPED
+  // when there is strong evidence of a network-side failure.
 
   const classifyCall = (
     pending: { callDuration: number; rsrp: number | null },
     disconnect?: { causeLabel?: string; duration?: number }
   ) => {
-    const { callDuration, rsrp } = pending;
+    const { callDuration } = pending;
     const causeLabel = disconnect?.causeLabel || null;
     const source = disconnect ? 'calllog' : 'timeout';
 
@@ -112,37 +123,32 @@ export default function VoiceScreen() {
     let completed = false;
     let rule = '';
 
-    // Priority 1: Explicit CallLog labels
+    // ── Explicit CallLog labels (highest priority) ──
     if (causeLabel === 'OUTGOING_FAILED') {
+      // Call never connected — count as a drop
       dropped = true;
       rule = 'OUTGOING_FAILED (call never connected)';
     } else if (causeLabel === 'MISSED') {
-      // Setup failure, not a drop — don't count as either
+      // Missed/unanswered — setup failure, not a drop
       rule = 'MISSED (setup failure, ignored)';
     } else if (causeLabel === 'INCOMING_REJECTED') {
-      // User chose to reject — not a drop
+      // User rejected — not a drop
       rule = 'INCOMING_REJECTED (user action, ignored)';
     }
-    // Priority 2: Signal + duration heuristics
+    // ── Strong evidence of network drop ──
+    // A call that was connected (offhook) but lasted less than 1 second
+    // is almost certainly a network failure, not a real conversation.
     else if (callDuration < 1000) {
       dropped = true;
-      rule = `Sub-1s call (${callDuration}ms) — almost certainly network failure`;
-    } else if (callDuration < 5000 && rsrp !== null && rsrp < -110) {
-      dropped = true;
-      rule = `Short call (${callDuration}ms) + weak signal (${rsrp} dBm)`;
+      rule = `Sub-1s connected call (${callDuration}ms) — likely network failure`;
     }
-    // Priority 3: Normal termination
-    else if (causeLabel === 'NORMAL' && callDuration >= 1000) {
+    // ── Default: assume normal user hangup → COMPLETED ──
+    // We cannot reliably distinguish "user pressed hangup" from
+    // "network dropped the call" via Android APIs, so we err on the
+    // side of COMPLETED to avoid inflating the Call Drop Ratio.
+    else {
       completed = true;
-      rule = `NORMAL termination, duration ${callDuration}ms`;
-    }
-    // Priority 4: Timeout fallbacks (no disconnect event received)
-    else if (source === 'timeout' && callDuration < 2000) {
-      dropped = true;
-      rule = `Timeout fallback — short call (${callDuration}ms)`;
-    } else {
-      completed = true;
-      rule = `Default completed — ${source}, duration ${callDuration}ms, signal ${rsrp ?? 'unknown'} dBm`;
+      rule = `Completed — ${source}, duration ${callDuration}ms (assume normal hangup)`;
     }
 
     console.log(`[Voice] Call classified: ${dropped ? 'DROPPED' : completed ? 'COMPLETED' : 'IGNORED'} | Rule: ${rule}`);
@@ -166,6 +172,10 @@ export default function VoiceScreen() {
   const isListeningRef = useRef(false);
   // Reference to CallDisconnectModule subscription so we can remove it on Stop
   const disconnectSubRef = useRef<any>(null);
+  // Reference to InCallService (CallDropBridgeModule) subscription
+  const inCallServiceSubRef = useRef<any>(null);
+  // Whether InCallService provided the disconnect cause (takes priority over CallLog)
+  const inCallServiceHandledRef = useRef(false);
 
   // Call Metrics listener — only processes events relevant to real calls
   useEffect(() => {
@@ -326,18 +336,82 @@ export default function VoiceScreen() {
         await CallMetrics.start();
         isListeningRef.current = true;
 
-        // Register CallDisconnect listener NOW (only after user explicitly starts)
+        // ── 1. Register InCallService listener (real DisconnectCause) ──
+        if (CallDropBridgeModule) {
+          try {
+            // Request telecom role (non-blocking — shows system dialog)
+            await CallDropBridgeModule.requestCallRole();
+
+            inCallServiceSubRef.current = CallDropBridgeModule.addListener('CallDropCauseEvent', (payload: any) => {
+              console.log('[Voice] InCallService DisconnectCause:', payload);
+
+              const pending = pendingCallRef.current;
+              if (pending) {
+                // Cancel all fallback timers — we have the real cause
+                if (classifyTimeoutRef.current) {
+                  clearTimeout(classifyTimeoutRef.current);
+                  classifyTimeoutRef.current = null;
+                }
+                inCallServiceHandledRef.current = true;
+
+                // Use REAL DisconnectCause for classification
+                const causeLabel = payload?.causeLabel || 'UNKNOWN';
+                let dropped = false;
+                let completed = false;
+                let rule = '';
+
+                if (causeLabel === 'ERROR' || causeLabel === 'OTHER') {
+                  dropped = true;
+                  rule = `InCallService: ${causeLabel} — network/system failure`;
+                } else if (causeLabel === 'LOCAL' || causeLabel === 'REMOTE') {
+                  completed = true;
+                  rule = `InCallService: ${causeLabel} — normal hangup`;
+                } else if (causeLabel === 'MISSED' || causeLabel === 'REJECTED' || causeLabel === 'CANCELED' || causeLabel === 'BUSY') {
+                  rule = `InCallService: ${causeLabel} — not a connected call, ignored`;
+                } else {
+                  completed = true;
+                  rule = `InCallService: ${causeLabel} — defaulting to completed`;
+                }
+
+                console.log(`[Voice] Call classified via InCallService: ${dropped ? 'DROPPED' : completed ? 'COMPLETED' : 'IGNORED'} | Rule: ${rule}`);
+
+                if (dropped || completed) {
+                  addVoiceSample({ callCompleted: completed, dropped });
+                }
+
+                // Record the disconnect reason for analytics
+                addVoiceSample({
+                  reasonCode: payload?.causeCode,
+                  reasonLabel: causeLabel,
+                  reasonSource: 'incallservice',
+                });
+
+                pendingCallRef.current = null;
+              }
+            });
+            console.log('[Voice] InCallService (CallDropBridgeModule) listener registered');
+          } catch (e) {
+            console.warn('[Voice] InCallService setup failed — will use CallLog fallback:', e);
+          }
+        }
+
+        // ── 2. Register CallLog-based disconnect listener (fallback) ──
         if (CallDisconnectModule) {
           try {
             await CallDisconnectModule.startListening();
             disconnectSubRef.current = CallDisconnectModule.addListener('CallDisconnectEvent', (payload) => {
-              console.log('[Voice] CallDisconnectEvent received:', payload);
+              console.log('[Voice] CallDisconnectEvent (CallLog) received:', payload);
 
-              // ── Deferred classification trigger ──
-              // If a pending call is waiting for this event, classify it now
+              // Skip if InCallService already handled this call
+              if (inCallServiceHandledRef.current) {
+                console.log('[Voice] Skipping CallLog event — InCallService already classified this call');
+                inCallServiceHandledRef.current = false;
+                return;
+              }
+
+              // Fallback: use CallLog-based classification
               const pending = pendingCallRef.current;
               if (pending) {
-                // Cancel the fallback timeout
                 if (classifyTimeoutRef.current) {
                   clearTimeout(classifyTimeoutRef.current);
                   classifyTimeoutRef.current = null;
@@ -349,16 +423,15 @@ export default function VoiceScreen() {
                 pendingCallRef.current = null;
               }
 
-              // Always record the disconnect reason for analytics
               if (payload?.causeCode !== undefined || payload?.causeLabel) {
                 addVoiceSample({
                   reasonCode: payload?.causeCode,
                   reasonLabel: payload?.causeLabel || 'Unknown',
-                  reasonSource: payload?.source || 'native',
+                  reasonSource: payload?.source || 'calllog',
                 });
               }
             });
-            console.log('[Voice] CallDisconnectModule started successfully');
+            console.log('[Voice] CallDisconnectModule (CallLog) started successfully');
           } catch (e) {
             console.warn('[Voice] CallDisconnectModule start failed:', e);
           }
@@ -396,6 +469,13 @@ export default function VoiceScreen() {
       callSetupStartTimeRef.current = null;
       stopMosPolling();
       cancelPendingClassification();
+
+      // Remove InCallService listener
+      if (inCallServiceSubRef.current) {
+        inCallServiceSubRef.current.remove();
+        inCallServiceSubRef.current = null;
+      }
+      inCallServiceHandledRef.current = false;
 
       // Remove CallDisconnect listener
       if (disconnectSubRef.current) {

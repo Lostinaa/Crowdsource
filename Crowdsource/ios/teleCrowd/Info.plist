@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>cs-qoe</string>
+    <string>teleCrowd</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -28,6 +28,12 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>com.dopy.csqoe</string>
+        </array>
+      </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>exp+cs-qoe</string>
         </array>
       </dict>
     </array>

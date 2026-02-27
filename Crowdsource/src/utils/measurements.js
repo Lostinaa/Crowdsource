@@ -123,9 +123,18 @@ export const runStreamingTest = async ({ addStreamingSample, silent = false }) =
         const effectiveTime = Math.max(streamTime, totalTime, 1);
         const throughputKbps = totalBytes > 0 && effectiveTime > 0 ? (totalBytes * 8) / effectiveTime : 0;
 
-        // MOS and resolution mapping per ITU-T G.1035
-        const mos = throughputKbps > 8000 ? 4.5 : throughputKbps > 4000 ? 4.0 : throughputKbps > 2000 ? 3.5 : throughputKbps > 500 ? 3.0 : 2.5;
-        const resolution = throughputKbps > 8000 ? '1080p' : throughputKbps > 4000 ? 'HD (720p)' : throughputKbps > 2000 ? 'SD (480p)' : '360p';
+        // Resolution and score mapping per QA specification:
+        // 2160p(4K)→5, 1440p(2K)→5, 1080p→5, 720p→4, 480p→3, 360p→2, 240p→1
+        let resolution, resolutionScore;
+        if (throughputKbps > 20000) { resolution = '2160p (4K)'; resolutionScore = 5; }
+        else if (throughputKbps > 12000) { resolution = '1440p (2K)'; resolutionScore = 5; }
+        else if (throughputKbps > 8000) { resolution = '1080p (Full HD)'; resolutionScore = 5; }
+        else if (throughputKbps > 4000) { resolution = '720p (HD)'; resolutionScore = 4; }
+        else if (throughputKbps > 2000) { resolution = '480p (SD)'; resolutionScore = 3; }
+        else if (throughputKbps > 500) { resolution = '360p'; resolutionScore = 2; }
+        else { resolution = '240p'; resolutionScore = 1; }
+
+        const mos = resolutionScore >= 5 ? 4.5 : resolutionScore === 4 ? 4.0 : resolutionScore === 3 ? 3.5 : resolutionScore === 2 ? 3.0 : 2.5;
         const bufferingCount = throughputKbps > 8000 ? 0 : throughputKbps > 4000 ? 1 : 2;
 
         addStreamingSample({
@@ -135,9 +144,10 @@ export const runStreamingTest = async ({ addStreamingSample, silent = false }) =
             throughputKbps,
             bufferingCount,
             resolution,
+            resolutionScore,
         });
 
-        return { success: true, throughputKbps, mos, resolution };
+        return { success: true, throughputKbps, mos, resolution, resolutionScore };
     } catch (error) {
         console.error('[Measurements] Streaming test error:', error);
         return { success: false, error: error.message };

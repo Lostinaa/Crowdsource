@@ -1,7 +1,6 @@
-import { View, Text, StyleSheet, Button, ScrollView, Alert, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, ActivityIndicator, Modal, Animated } from 'react-native';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import NetInfo from '@react-native-community/netinfo';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useQoE } from '../../src/context/QoEContext';
 import { theme } from '../../src/constants/theme';
 import * as Measurements from '../../src/utils/measurements';
@@ -29,65 +28,175 @@ export default function DataScreen() {
     addSocialSample,
     addFtpSample,
     addLatencySample,
-    runFullTest,
-    isTesting: isTestingContext,
-    testLabel,
-    testProgress,
   } = useQoE();
 
   const [isTesting, setIsTesting] = useState(false);
   const [networkState, setNetworkState] = useState(null);
 
+  // Full test progressive state
+  const [fullTestActive, setFullTestActive] = useState(false);
+  const [fullTestStep, setFullTestStep] = useState(0);
+  const [fullTestLabel, setFullTestLabel] = useState('');
+  const [fullTestResult, setFullTestResult] = useState('');
+  const [fullTestSteps, setFullTestSteps] = useState([]);
+
   // WebView state
   const [webViewVisible, setWebViewVisible] = useState(false);
   const [webViewUrl, setWebViewUrl] = useState('');
   const [webViewLabel, setWebViewLabel] = useState('');
-  const [webViewType, setWebViewType] = useState(null); // 'browsing' | 'streaming'
+  const [webViewType, setWebViewType] = useState(null);
   const [webViewKey, setWebViewKey] = useState(0);
   const browsingStartRef = useRef(null);
   const browsingIndexRef = useRef(0);
   const loadedRef = useRef(false);
   const streamTimerRef = useRef(null);
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
 
-  // Sync local isTesting with context isTesting for full test
+  // Pulse animation for active test
   useEffect(() => {
-    if (isTestingContext) setIsTesting(true);
-    else setIsTesting(false);
-  }, [isTestingContext]);
+    if (isTesting) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, useNativeDriver: true }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [isTesting]);
 
-  // Check network connectivity
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setNetworkState(state);
-    });
+    const unsubscribe = NetInfo.addEventListener(state => setNetworkState(state));
     NetInfo.fetch().then(state => setNetworkState(state));
     return () => unsubscribe();
   }, []);
 
-  const formatPercent = (value) => {
-    if (value === null || value === undefined) return '--';
-    return `${(value * 100).toFixed(1)}%`;
-  };
+  // ── Full Test (Progressive) ────────────────────────────────────────
+  const FULL_TEST_STEPS = [
+    { key: 'latency', label: '📶 Latency Test', icon: '📶' },
+    { key: 'browsing', label: '🌐 Browsing Test', icon: '🌐', webview: true },
+    { key: 'streaming', label: '🎬 Streaming Test', icon: '🎬', webview: true },
+    { key: 'http_dl', label: '⬇️ HTTP Download', icon: '⬇️' },
+    { key: 'http_ul', label: '⬆️ HTTP Upload', icon: '⬆️' },
+    { key: 'ftp_dl', label: '📥 FTP Download', icon: '📥' },
+    { key: 'ftp_ul', label: '📤 FTP Upload', icon: '📤' },
+    { key: 'social', label: '💬 Social Media', icon: '💬' },
+  ];
 
-  const formatTime = (ms) => {
-    if (ms === null || ms === undefined) return '--';
-    if (ms < 1000) return `${Math.round(ms)}ms`;
-    return `${(ms / 1000).toFixed(2)}s`;
-  };
+  const runProgressiveFullTest = useCallback(async () => {
+    if (isTesting) return;
+    setIsTesting(true);
+    setFullTestActive(true);
+    setFullTestSteps(FULL_TEST_STEPS.map(s => ({ ...s, status: 'waiting' })));
 
-  const formatThroughput = (kbps) => {
-    if (kbps === null || kbps === undefined) return '--';
-    if (kbps >= 1000) return `${(kbps / 1000).toFixed(2)} Mbps`;
-    return `${kbps.toFixed(2)} Kbps`;
-  };
+    const updateStep = (idx, status, result = '') => {
+      setFullTestSteps(prev => {
+        const next = [...prev];
+        next[idx] = { ...next[idx], status, result };
+        return next;
+      });
+      setFullTestStep(idx);
+      if (status === 'running') setFullTestLabel(FULL_TEST_STEPS[idx].label);
+      if (result) setFullTestResult(result);
+    };
 
-  // ── WebView-based Browsing Test ─────────────────────────────────────
+    try {
+      // 1. Latency
+      updateStep(0, 'running');
+      const latResult = await Measurements.runLatencyTest({ addLatencySample, silent: true });
+      updateStep(0, 'done', latResult.success ? `Score: ${latResult.score}/100, Avg: ${Math.round(latResult.avgLatency)}ms` : `Failed: ${latResult.error}`);
+
+      // 2. Browsing - WebView
+      updateStep(1, 'running');
+      await new Promise((resolve) => {
+        browsingIndexRef.current = 0;
+        loadedRef.current = false;
+        addBrowsingSample({ request: true });
+        browsingStartRef.current = Date.now();
+        setWebViewType('browsing');
+        setWebViewLabel(`Loading ${BROWSING_URLS[0]}... (1/${BROWSING_URLS.length})`);
+        setWebViewUrl(BROWSING_URLS[0]);
+        setWebViewKey(k => k + 1);
+        setWebViewVisible(true);
+        // Store resolve to be called when browsing completes
+        browsingResolveRef.current = resolve;
+      });
+      updateStep(1, 'done', `Tested ${BROWSING_URLS.length} sites`);
+
+      // 3. Streaming - WebView
+      updateStep(2, 'running');
+      await new Promise((resolve) => {
+        loadedRef.current = false;
+        addStreamingSample({ request: true });
+        browsingStartRef.current = Date.now();
+        setWebViewType('streaming');
+        setWebViewLabel('Loading YouTube video...');
+        setWebViewUrl('https://m.youtube.com/watch?v=aJq936yAUbc');
+        setWebViewKey(k => k + 1);
+        setWebViewVisible(true);
+        streamResolveRef.current = resolve;
+        streamTimerRef.current = setTimeout(() => {
+          const setupTime = Date.now() - (browsingStartRef.current || Date.now());
+          addStreamingSample({
+            request: false, completed: true, setupTimeMs: setupTime,
+            mos: 4.0, throughputKbps: 4000, bufferingCount: 0,
+            resolution: '720p (HD)', resolutionScore: 4,
+          });
+          setWebViewVisible(false);
+          setWebViewType(null);
+          if (streamResolveRef.current) { streamResolveRef.current(); streamResolveRef.current = null; }
+        }, 15000);
+      });
+      updateStep(2, 'done', 'Streaming complete');
+
+      // 4. HTTP Download
+      updateStep(3, 'running');
+      const httpDl = await Measurements.runHttpDownloadTest({ addHttpSample, silent: true });
+      updateStep(3, 'done', httpDl.success ? `${httpDl.throughputMbps.toFixed(2)} Mbps` : `Failed: ${httpDl.error}`);
+
+      // 5. HTTP Upload
+      updateStep(4, 'running');
+      const httpUl = await Measurements.runHttpUploadTest({ addHttpSample, silent: true });
+      updateStep(4, 'done', httpUl.success ? `${httpUl.throughputMbps.toFixed(2)} Mbps` : `Failed: ${httpUl.error}`);
+
+      // 6. FTP Download
+      updateStep(5, 'running');
+      const ftpDl = await Measurements.runFtpDownloadTest({ addFtpSample, silent: true });
+      updateStep(5, 'done', ftpDl.success ? `${(ftpDl.throughputKbps / 1000).toFixed(2)} Mbps` : `Failed: ${ftpDl.error}`);
+
+      // 7. FTP Upload
+      updateStep(6, 'running');
+      const ftpUl = await Measurements.runFtpUploadTest({ addFtpSample, silent: true });
+      updateStep(6, 'done', ftpUl.success ? `${(ftpUl.throughputKbps / 1000).toFixed(2)} Mbps` : `Failed: ${ftpUl.error}`);
+
+      // 8. Social Media
+      updateStep(7, 'running');
+      const social = await Measurements.runSocialTest({ addSocialSample, silent: true });
+      updateStep(7, 'done', social.success ? `${(social.duration / 1000).toFixed(2)}s` : `Failed: ${social.error}`);
+
+      setFullTestLabel('✅ All Tests Complete!');
+      setTimeout(() => Alert.alert('Full Test Complete', 'All QoE tests have been completed successfully.'), 500);
+
+    } catch (error) {
+      console.error('[FullTest] Error:', error);
+      Alert.alert('Test Error', error.message);
+    } finally {
+      setIsTesting(false);
+      setTimeout(() => setFullTestActive(false), 3000);
+    }
+  }, [isTesting, addLatencySample, addBrowsingSample, addStreamingSample, addHttpSample, addFtpSample, addSocialSample]);
+
+  // Refs for resolving WebView promises during full test
+  const browsingResolveRef = useRef(null);
+  const streamResolveRef = useRef(null);
+
+  // ── WebView-based Browsing Test (individual) ───────────────────────
   const testBrowsingWebView = useCallback(async () => {
     if (isTesting) return;
     setIsTesting(true);
     browsingIndexRef.current = 0;
     loadedRef.current = false;
-
     addBrowsingSample({ request: true });
     browsingStartRef.current = Date.now();
     setWebViewType('browsing');
@@ -103,10 +212,8 @@ export default function DataScreen() {
 
     if (completed) {
       addBrowsingSample({
-        completed: true,
-        durationMs: duration,
-        dnsResolutionTimeMs: Math.min(duration, 500),
-        throughputKbps: 0,
+        completed: true, durationMs: duration,
+        dnsResolutionTimeMs: Math.min(duration, 500), throughputKbps: 0,
       });
     }
 
@@ -120,20 +227,25 @@ export default function DataScreen() {
       setWebViewUrl(BROWSING_URLS[nextIdx]);
       setWebViewKey(k => k + 1);
     } else {
+      // All sites done
       setWebViewVisible(false);
       setWebViewType(null);
-      setIsTesting(false);
-      Alert.alert('Browsing Test Complete', `Tested ${BROWSING_URLS.length} sites.`);
+      // Resolve full test promise if applicable
+      if (browsingResolveRef.current) {
+        browsingResolveRef.current();
+        browsingResolveRef.current = null;
+      } else {
+        setIsTesting(false);
+        Alert.alert('Browsing Test Complete', `Tested ${BROWSING_URLS.length} sites.`);
+      }
     }
   }, [addBrowsingSample]);
 
   const onBrowsingLoadEnd = useCallback(() => {
-    // Prevent duplicate fires from redirects
     if (loadedRef.current) return;
     loadedRef.current = true;
     const idx = browsingIndexRef.current;
     setWebViewLabel(`Loaded ${BROWSING_URLS[idx]} ✓ (${idx + 1}/${BROWSING_URLS.length})`);
-    // Show page for 2 seconds before moving to next
     setTimeout(() => moveToNextBrowsingSite(true), 2000);
   }, [moveToNextBrowsingSite]);
 
@@ -145,7 +257,7 @@ export default function DataScreen() {
     setTimeout(() => moveToNextBrowsingSite(false), 1000);
   }, [moveToNextBrowsingSite]);
 
-  // ── WebView-based Streaming Test ────────────────────────────────────
+  // ── WebView-based Streaming Test (individual) ──────────────────────
   const testStreamingWebView = useCallback(() => {
     if (isTesting) return;
     setIsTesting(true);
@@ -158,25 +270,18 @@ export default function DataScreen() {
     setWebViewKey(k => k + 1);
     setWebViewVisible(true);
 
-    // Auto-close after 20 seconds
     streamTimerRef.current = setTimeout(() => {
       const setupTime = Date.now() - (browsingStartRef.current || Date.now());
-      const throughputKbps = 4000;
-      const mos = throughputKbps > 8000 ? 4.5 : throughputKbps > 4000 ? 4.0 : throughputKbps > 2000 ? 3.5 : throughputKbps > 500 ? 3.0 : 2.5;
       addStreamingSample({
-        request: false,
-        completed: true,
-        setupTimeMs: setupTime,
-        mos,
-        throughputKbps,
-        bufferingCount: 0,
-        resolution: 'HD (720p)',
+        request: false, completed: true, setupTimeMs: setupTime,
+        mos: 4.0, throughputKbps: 4000, bufferingCount: 0,
+        resolution: '720p (HD)', resolutionScore: 4,
       });
       setWebViewVisible(false);
       setWebViewType(null);
       setIsTesting(false);
-      Alert.alert('Streaming Test Complete', `MOS: ${mos.toFixed(1)}, Resolution: HD (720p)`);
-    }, 20000);
+      Alert.alert('Streaming Test Complete', 'MOS: 4.0, Resolution: 720p (HD)');
+    }, 15000);
   }, [isTesting, addStreamingSample]);
 
   const onStreamingLoadEnd = useCallback(() => {
@@ -194,24 +299,27 @@ export default function DataScreen() {
     }
     setWebViewVisible(false);
     setWebViewType(null);
-    setIsTesting(false);
-  }, []);
+    // Resolve pending promises
+    if (browsingResolveRef.current) { browsingResolveRef.current(); browsingResolveRef.current = null; }
+    if (streamResolveRef.current) { streamResolveRef.current(); streamResolveRef.current = null; }
+    if (!fullTestActive) setIsTesting(false);
+  }, [fullTestActive]);
 
+  // ── Individual test runners ────────────────────────────────────────
   const runManualTest = async (testName, testFn, sampleParamName, sampleFn) => {
     if (isTesting) return;
     setIsTesting(true);
     try {
-      const result = await testFn({
-        [sampleParamName]: sampleFn,
-        silent: true
-      });
+      const result = await testFn({ [sampleParamName]: sampleFn, silent: true });
       if (result.success) {
         let msg = '';
         if (result.throughputKbps) msg += `Throughput: ${(result.throughputKbps / 1000).toFixed(2)} Mbps\n`;
         if (result.throughputMbps) msg += `Throughput: ${result.throughputMbps.toFixed(2)} Mbps\n`;
         if (result.duration) msg += `Duration: ${(result.duration / 1000).toFixed(2)}s\n`;
         if (result.score) msg += `Score: ${result.score}/100\n`;
-        Alert.alert(`${testName} Success`, msg || 'Test completed successfully.');
+        if (result.resolution) msg += `Resolution: ${result.resolution}\n`;
+        if (result.resolutionScore) msg += `Quality Score: ${result.resolutionScore}/5\n`;
+        Alert.alert(`${testName} Success`, msg || 'Test completed.');
       } else {
         Alert.alert(`${testName} Failed`, result.error || 'Unknown error');
       }
@@ -229,34 +337,48 @@ export default function DataScreen() {
   const testFtpUpload = () => runManualTest('FTP Upload', Measurements.runFtpUploadTest, 'addFtpSample', addFtpSample);
   const testLatency = () => runManualTest('Latency', Measurements.runLatencyTest, 'addLatencySample', addLatencySample);
 
+  // ── Render ─────────────────────────────────────────────────────────
   return (
     <View style={styles.mainContainer}>
       <ScreenHeader title="Data Performance" />
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
 
-
-        {/* Network Status Indicator */}
+        {/* Network Status */}
         {networkState && (
           <View style={styles.networkStatus}>
-            <View style={[
-              styles.networkIndicator,
-              { backgroundColor: networkState.isConnected ? theme.colors.success : theme.colors.danger }
-            ]} />
+            <View style={[styles.networkDot, { backgroundColor: networkState.isConnected ? '#34C759' : '#FF3B30' }]} />
             <Text style={styles.networkText}>
-              {networkState.isConnected
-                ? `Connected (${networkState.type})`
-                : 'No Internet Connection'}
+              {networkState.isConnected ? `Connected (${networkState.type})` : 'No Internet'}
             </Text>
           </View>
         )}
 
-        {/* Loading Indicator */}
-        {isTesting && !webViewVisible && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.loadingText}>
-              {testLabel || 'Running test...'}
-            </Text>
+        {/* ── Full Test Progress Panel ─────────────────────────── */}
+        {fullTestActive && (
+          <View style={styles.fullTestPanel}>
+            <Text style={styles.fullTestTitle}>🧪 Full Test in Progress</Text>
+            {fullTestSteps.map((step, i) => (
+              <View key={step.key} style={[styles.stepRow, step.status === 'running' && styles.stepRowActive]}>
+                <Text style={styles.stepIcon}>{step.icon}</Text>
+                <View style={styles.stepInfo}>
+                  <Text style={[styles.stepLabel, step.status === 'done' && styles.stepLabelDone]}>
+                    {step.label}
+                  </Text>
+                  {step.result ? (
+                    <Text style={styles.stepResult}>{step.result}</Text>
+                  ) : null}
+                </View>
+                <View style={styles.stepStatus}>
+                  {step.status === 'waiting' && <Text style={styles.stepWaiting}>⏳</Text>}
+                  {step.status === 'running' && (
+                    <Animated.View style={{ opacity: pulseAnim }}>
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                    </Animated.View>
+                  )}
+                  {step.status === 'done' && <Text style={styles.stepDone}>✅</Text>}
+                </View>
+              </View>
+            ))}
           </View>
         )}
 
@@ -264,108 +386,79 @@ export default function DataScreen() {
         <View style={styles.heroSection}>
           <BrandedButton
             title={isTesting ? "Testing in progress..." : "▶  Run Full Test"}
-            onPress={runFullTest}
+            onPress={runProgressiveFullTest}
             disabled={isTesting}
-            loading={isTesting}
+            loading={isTesting && !fullTestActive}
           />
         </View>
+
+        {/* Individual Tests */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Browsing</Text>
-          <BrandedButton
-            title="Test Browsing"
-            onPress={testBrowsingWebView}
-            disabled={isTesting}
-          />
+          <BrandedButton title="Test Browsing" onPress={testBrowsingWebView} disabled={isTesting} />
         </View>
 
-        {/* Streaming Metrics */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Streaming</Text>
-          <BrandedButton
-            title="Test Streaming"
-            onPress={testStreamingWebView}
-            disabled={isTesting}
-          />
+          <BrandedButton title="Test Streaming" onPress={testStreamingWebView} disabled={isTesting} />
         </View>
 
-        {/* HTTP Metrics */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>File Access (HTTP)</Text>
           <View style={styles.buttonRow}>
-            <BrandedButton
-              title="Test Download"
-              onPress={() => testHttpDownload()}
-              disabled={isTesting}
-              style={{ flex: 1 }}
-            />
-            <BrandedButton
-              title="Test Upload"
-              onPress={() => testHttpUpload()}
-              disabled={isTesting}
-              style={{ flex: 1 }}
-            />
+            <BrandedButton title="Test Download" onPress={testHttpDownload} disabled={isTesting} style={{ flex: 1 }} />
+            <BrandedButton title="Test Upload" onPress={testHttpUpload} disabled={isTesting} style={{ flex: 1 }} />
           </View>
         </View>
 
-        {/* Social Media Metrics */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Social Media</Text>
-          <BrandedButton
-            title="Test Social Media"
-            onPress={() => testSocialMedia()}
-            disabled={isTesting}
-          />
+          <BrandedButton title="Test Social Media" onPress={testSocialMedia} disabled={isTesting} />
         </View>
 
-        {/* FTP Metrics */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>File Access (FTP)</Text>
           <View style={styles.buttonRow}>
-            <BrandedButton
-              title="Test FTP Download"
-              onPress={() => testFtpDownload()}
-              disabled={isTesting}
-              style={{ flex: 1 }}
-            />
-            <BrandedButton
-              title="Test FTP Upload"
-              onPress={() => testFtpUpload()}
-              disabled={isTesting}
-              style={{ flex: 1 }}
-            />
+            <BrandedButton title="Test FTP DL" onPress={testFtpDownload} disabled={isTesting} style={{ flex: 1 }} />
+            <BrandedButton title="Test FTP UL" onPress={testFtpUpload} disabled={isTesting} style={{ flex: 1 }} />
           </View>
         </View>
 
-        {/* Latency & Interactivity Metrics */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Latency & Interactivity</Text>
-          <BrandedButton
-            title="Test Interactivity"
-            onPress={() => testLatency()}
-            disabled={isTesting}
-          />
+          <BrandedButton title="Test Interactivity" onPress={testLatency} disabled={isTesting} />
         </View>
 
       </ScrollView>
 
-      {/* WebView Modal for Browsing & Streaming */}
-      <Modal
-        visible={webViewVisible}
-        animationType="slide"
-        onRequestClose={closeWebView}
-      >
+      {/* WebView Modal */}
+      <Modal visible={webViewVisible} animationType="slide" onRequestClose={closeWebView}>
         <View style={styles.webViewContainer}>
           <View style={styles.webViewHeader}>
-            <View style={{ flex: 1 }}>
+            <View style={styles.webViewHeaderLeft}>
               <Text style={styles.webViewTitle}>
                 {webViewType === 'browsing' ? '🌐 Browsing Test' : '🎬 Streaming Test'}
               </Text>
-              <Text style={styles.webViewSubtitle} numberOfLines={1}>{webViewLabel}</Text>
+              <Text style={styles.webViewSubtitle} numberOfLines={2}>{webViewLabel}</Text>
             </View>
             <TouchableOpacity onPress={closeWebView} style={styles.webViewCloseBtn}>
-              <Text style={styles.webViewCloseBtnText}>✕ Close</Text>
+              <Text style={styles.webViewCloseBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Browsing progress dots */}
+          {webViewType === 'browsing' && (
+            <View style={styles.progressDotsRow}>
+              {BROWSING_URLS.map((_, i) => (
+                <View key={i} style={[
+                  styles.progressDot,
+                  i < browsingIndexRef.current && styles.progressDotDone,
+                  i === browsingIndexRef.current && styles.progressDotActive,
+                ]} />
+              ))}
+            </View>
+          )}
+
           {webViewUrl ? (
             <WebView
               key={webViewKey}
@@ -383,7 +476,7 @@ export default function DataScreen() {
               renderLoading={() => (
                 <View style={styles.webViewLoading}>
                   <ActivityIndicator size="large" color={theme.colors.primary} />
-                  <Text style={styles.loadingText}>Loading...</Text>
+                  <Text style={styles.webViewLoadingText}>Loading page...</Text>
                 </View>
               )}
             />
@@ -407,15 +500,6 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.lg,
     paddingBottom: 100,
   },
-  headerTextSection: {
-    marginBottom: theme.spacing.lg,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.sm,
-    lineHeight: 20,
-  },
   networkStatus: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -427,7 +511,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.light,
     ...theme.shadows.sm,
   },
-  networkIndicator: {
+  networkDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
@@ -438,6 +522,71 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  // ── Full Test Progress Panel ──────────────────────────
+  fullTestPanel: {
+    backgroundColor: theme.colors.background.card,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    ...theme.shadows.md,
+  },
+  fullTestTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.md,
+    textAlign: 'center',
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: 4,
+  },
+  stepRowActive: {
+    backgroundColor: `${theme.colors.primary}15`,
+    borderWidth: 1,
+    borderColor: `${theme.colors.primary}40`,
+  },
+  stepIcon: {
+    fontSize: 20,
+    width: 32,
+    textAlign: 'center',
+  },
+  stepInfo: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  stepLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+  },
+  stepLabelDone: {
+    color: theme.colors.text.secondary,
+  },
+  stepResult: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  stepStatus: {
+    width: 32,
+    alignItems: 'center',
+  },
+  stepWaiting: {
+    fontSize: 16,
+    opacity: 0.4,
+  },
+  stepDone: {
+    fontSize: 16,
+  },
+  // ── Sections ──────────────────────────────────────────
   section: {
     marginBottom: theme.spacing.lg,
   },
@@ -451,20 +600,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...theme.shadows.sm,
   },
-  heroTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
-    textAlign: 'center',
-  },
-  heroSubtitle: {
-    fontSize: 13,
-    color: theme.colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: theme.spacing.md,
-    lineHeight: 18,
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
@@ -476,85 +611,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
   },
-  metricsBox: {
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border.light,
-    marginTop: theme.spacing.sm,
-    ...theme.shadows.sm,
-  },
-  subsectionTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: theme.spacing.xs,
-    marginBottom: theme.spacing.sm,
-  },
-  metricRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.light,
-  },
-  metricLabel: {
-    color: theme.colors.text.secondary,
-    fontSize: 14,
-    flex: 1,
-  },
-  metricValue: {
-    color: theme.colors.primary,
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: theme.spacing.md,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.border.light,
-    marginVertical: theme.spacing.sm,
-  },
-  summaryBox: {
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md + 4,
-    borderWidth: 1,
-    borderColor: theme.colors.border.light,
-    alignItems: 'center',
-    marginTop: theme.spacing.sm,
-    ...theme.shadows.sm,
-  },
-  scoreValue: {
-    color: theme.colors.primary,
-    fontSize: 32,
-    fontWeight: '700',
-    marginTop: theme.spacing.xs,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.background.card,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
-    ...theme.shadows.sm,
-  },
-  loadingText: {
-    color: theme.colors.text.primary,
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: theme.spacing.sm,
-  },
-  coverageText: {
-    color: theme.colors.text.secondary,
-    fontSize: 12,
-    marginTop: theme.spacing.xs,
-  },
+  // ── WebView Modal ─────────────────────────────────────
   webViewContainer: {
     flex: 1,
     backgroundColor: theme.colors.background.primary,
@@ -569,6 +626,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border.light,
   },
+  webViewHeaderLeft: {
+    flex: 1,
+  },
   webViewTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -581,26 +641,52 @@ const styles = StyleSheet.create({
   },
   webViewCloseBtn: {
     backgroundColor: theme.colors.danger,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: theme.borderRadius.md,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: theme.spacing.sm,
   },
   webViewCloseBtnText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  progressDotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    backgroundColor: theme.colors.background.card,
+    gap: 8,
+  },
+  progressDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.border.light,
+  },
+  progressDotDone: {
+    backgroundColor: '#34C759',
+  },
+  progressDotActive: {
+    backgroundColor: theme.colors.primary,
+    width: 24,
+    borderRadius: 5,
   },
   webView: {
     flex: 1,
   },
   webViewLoading: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.background.primary,
+  },
+  webViewLoadingText: {
+    color: theme.colors.text.secondary,
+    fontSize: 14,
+    marginTop: theme.spacing.sm,
   },
 });

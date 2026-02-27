@@ -33,3 +33,16 @@ export type CallDisconnectEventPayload = {
 export type CallDisconnectModuleEvents = {
   'CallDisconnectEvent': (params: CallDisconnectEventPayload) => void;
 };
+
+// ── InCallService-based disconnect cause (real DisconnectCause from Telecom API) ──
+export type CallDropCausePayload = {
+  causeCode: number;      // DisconnectCause code (1=LOCAL, 2=REMOTE, 3=ERROR, etc.)
+  causeLabel: string;     // Human-readable label (LOCAL, REMOTE, ERROR, MISSED, etc.)
+  causeDescription: string;
+  callDurationMs: number;
+  source: string;         // Always 'incallservice'
+};
+
+export type CallDropBridgeModuleEvents = {
+  'CallDropCauseEvent': (params: CallDropCausePayload) => void;
+};

@@ -38,6 +38,7 @@ const createInitialMetrics = () => ({
       throughputs: [],
       bufferingCounts: [],
       resolutions: [],
+      resolutionScores: [],
     },
     social: {
       requests: 0,
@@ -281,6 +282,7 @@ export const QoEProvider = ({ children }) => {
         throughputKbps,
         bufferingCount,
         resolution,
+        resolutionScore,
       } = sample || {};
 
       console.log('[Data] Streaming sample:', { request, completed, mos, setupTimeMs, throughputKbps, bufferingCount, resolution });
@@ -315,6 +317,12 @@ export const QoEProvider = ({ children }) => {
         next.data.streaming.resolutions = [
           ...(next.data.streaming.resolutions || []),
           resolution,
+        ];
+      }
+      if (typeof resolutionScore === 'number') {
+        next.data.streaming.resolutionScores = [
+          ...(next.data.streaming.resolutionScores || []),
+          resolutionScore,
         ];
       }
       return next;

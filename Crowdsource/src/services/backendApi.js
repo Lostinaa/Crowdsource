@@ -136,6 +136,7 @@ class BackendApiClient {
             throughputs: metrics.data?.streaming?.throughputs || [],
             bufferingCounts: metrics.data?.streaming?.bufferingCounts || [],
             resolutions: metrics.data?.streaming?.resolutions || [],
+            resolutionScores: metrics.data?.streaming?.resolutionScores || [],
           },
           http: {
             dl: {
@@ -145,7 +146,7 @@ class BackendApiClient {
             },
             ul: {
               requests: metrics.data?.http?.ul?.requests || 0,
-              completed: metrics.data?.http?.ul?.completed || 0,  
+              completed: metrics.data?.http?.ul?.completed || 0,
               throughputs: metrics.data?.http?.ul?.throughputs || [],
             },
           },

@@ -7,7 +7,8 @@
     "modules": [
       "expo.modules.callmetrics.CallMetricsModule",
       "expo.modules.callmetrics.CallDisconnectModule",
-      "expo.modules.callmetrics.DeviceDiagnosticModule"
+      "expo.modules.callmetrics.DeviceDiagnosticModule",
+      "expo.modules.callmetrics.CallDropBridgeModule"
     ]
   }
 }
