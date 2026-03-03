@@ -25,7 +25,8 @@
                         <div class="space-y-1">
                             <div class="text-sm font-medium text-gray-500">CSSR</div>
                             <div class="text-3xl font-bold text-primary-600">
-                                {{ number_format($voice['cssr'] ?? 0, 1) }}%</div>
+                                {{ number_format($voice['cssr'] ?? 0, 1) }}%
+                            </div>
                             <div class="text-xs text-gray-400">Call Setup Success Ratio</div>
                         </div>
                     </x-filament::card>
@@ -93,12 +94,14 @@
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Total Requests</td>
                                         <td class="px-4 py-3 whitespace-nowrap">
-                                            {{ $data['browsing']['total_requests'] ?? 0 }}</td>
+                                            {{ $data['browsing']['total_requests'] ?? 0 }}
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Completed</td>
                                         <td class="px-4 py-3 whitespace-nowrap">
-                                            {{ $data['browsing']['total_completed'] ?? 0 }}</td>
+                                            {{ $data['browsing']['total_completed'] ?? 0 }}
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Average Duration</td>
@@ -167,6 +170,28 @@
                                             {{ $data['streaming']['average_setup_time'] !== null ? number_format($data['streaming']['average_setup_time'] / 1000, 2) . 's' : 'N/A' }}
                                         </td>
                                     </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 whitespace-nowrap font-medium">Average Resolution Score
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            <span class="font-bold text-primary-600 dark:text-primary-400">
+                                                {{ isset($data['streaming']['average_resolution_score']) && $data['streaming']['average_resolution_score'] !== null ? number_format($data['streaming']['average_resolution_score'], 1) . ' / 5' : 'N/A' }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    @if(!empty($data['streaming']['resolution_distribution'] ?? []))
+                                        <tr>
+                                            <td class="px-4 py-3 whitespace-nowrap font-medium">Resolution Distribution</td>
+                                            <td class="px-4 py-3">
+                                                @foreach($data['streaming']['resolution_distribution'] as $res => $pct)
+                                                    <span
+                                                        class="inline-block px-2 py-1 mr-1 mb-1 text-xs rounded-full bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300">
+                                                        {{ $res }}: {{ $pct }}%
+                                                    </span>
+                                                @endforeach
+                                            </td>
+                                        </tr>
+                                    @endif
                                 </tbody>
                             </table>
                         </div>
@@ -221,7 +246,8 @@
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Total Requests</td>
                                         <td class="px-4 py-3 whitespace-nowrap">
-                                            {{ $data['http']['download']['total_requests'] ?? 0 }}</td>
+                                            {{ $data['http']['download']['total_requests'] ?? 0 }}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -277,7 +303,8 @@
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Total Requests</td>
                                         <td class="px-4 py-3 whitespace-nowrap">
-                                            {{ $data['ftp']['download']['total_requests'] ?? 0 }}</td>
+                                            {{ $data['ftp']['download']['total_requests'] ?? 0 }}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -327,7 +354,8 @@
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Total Requests</td>
                                         <td class="px-4 py-3 whitespace-nowrap">
-                                            {{ $data['social']['total_requests'] ?? 0 }}</td>
+                                            {{ $data['social']['total_requests'] ?? 0 }}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -380,7 +408,8 @@
                                     <tr>
                                         <td class="px-4 py-3 whitespace-nowrap font-medium">Total Requests</td>
                                         <td class="px-4 py-3 whitespace-nowrap">
-                                            {{ $data['latency']['total_requests'] ?? 0 }}</td>
+                                            {{ $data['latency']['total_requests'] ?? 0 }}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>

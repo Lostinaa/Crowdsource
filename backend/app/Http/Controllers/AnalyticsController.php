@@ -171,6 +171,36 @@ class AnalyticsController extends Controller
         $streamingCompleted = $metrics->sum(fn($m) => $m->metrics['data']['streaming']['completed'] ?? 0);
         $streamingMosSamples = $this->getAllValuesFromNested($metrics, 'data.streaming.mosSamples');
         $streamingSetupTimes = $this->getAllValuesFromNested($metrics, 'data.streaming.setupTimes');
+        $streamingResolutions = $this->getAllValuesFromNested($metrics, 'data.streaming.resolutions');
+        $streamingResolutionScores = $this->getAllValuesFromNested($metrics, 'data.streaming.resolutionScores');
+
+        // Resolution score mapping: 2160p/1440p/1080p→5, 720p→4, 480p→3, 360p→2, 240p→1
+        $resolutionScoreMap = [
+            '2160p (4K)' => 5,
+            '1440p (2K)' => 5,
+            '1080p (Full HD)' => 5,
+            '1080p' => 5,
+            '720p (HD)' => 4,
+            'HD (720p)' => 4,
+            '720p' => 4,
+            '480p (SD)' => 3,
+            'SD (480p)' => 3,
+            '480p' => 3,
+            '360p' => 2,
+            '240p' => 1,
+        ];
+        // Calculate avg resolution score from stored resolutionScores or map from resolution strings
+        $resolvedScores = $streamingResolutionScores->count() > 0
+            ? $streamingResolutionScores
+            : $streamingResolutions->map(fn($r) => $resolutionScoreMap[$r] ?? 2);
+        $avgResolutionScore = $resolvedScores->count() > 0 ? $resolvedScores->avg() : null;
+
+        // Resolution distribution
+        $resolutionDistribution = $streamingResolutions->count() > 0
+            ? $streamingResolutions->countBy()->map(function ($count) use ($streamingResolutions) {
+                return round(($count / $streamingResolutions->count()) * 100, 1);
+            })->toArray()
+            : [];
 
         // HTTP Download analytics
         $httpDlRequests = $metrics->sum(fn($m) => $m->metrics['data']['http']['dl']['requests'] ?? 0);
@@ -186,11 +216,11 @@ class AnalyticsController extends Controller
         $ftpDlRequests = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['dl']['requests'] ?? 0);
         $ftpDlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['dl']['completed'] ?? 0);
         $ftpDlThroughputs = $this->getAllValuesFromNested($metrics, 'data.ftp.dl.throughputs')
-            ->map(fn($v) => $v / 1000); // Kbps → Mbps
+            ->map(fn($v) => $v / 1000);
         $ftpUlRequests = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['ul']['requests'] ?? 0);
         $ftpUlCompleted = $metrics->sum(fn($m) => $m->metrics['data']['ftp']['ul']['completed'] ?? 0);
         $ftpUlThroughputs = $this->getAllValuesFromNested($metrics, 'data.ftp.ul.throughputs')
-            ->map(fn($v) => $v / 1000); // Kbps → Mbps
+            ->map(fn($v) => $v / 1000);
 
         // Social analytics
         $socialRequests = $metrics->sum(fn($m) => $m->metrics['data']['social']['requests'] ?? 0);
@@ -221,6 +251,8 @@ class AnalyticsController extends Controller
                 'setup_time_over_5s_percentage' => $streamingSetupTimes->count() > 0
                     ? ($streamingSetupTimes->filter(fn($v) => $v > 5000)->count() / $streamingSetupTimes->count()) * 100
                     : null,
+                'average_resolution_score' => $avgResolutionScore,
+                'resolution_distribution' => $resolutionDistribution,
             ],
             'http' => [
                 'download' => [
