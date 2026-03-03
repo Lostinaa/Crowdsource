@@ -124,16 +124,15 @@ export default function VoiceScreen() {
     let rule = '';
 
     // ── Explicit CallLog labels (highest priority) ──
-    if (causeLabel === 'OUTGOING_FAILED') {
-      // Call never connected — count as a drop
-      dropped = true;
-      rule = 'OUTGOING_FAILED (call never connected)';
-    } else if (causeLabel === 'MISSED') {
+    if (causeLabel === 'MISSED') {
       // Missed/unanswered — setup failure, not a drop
       rule = 'MISSED (setup failure, ignored)';
     } else if (causeLabel === 'INCOMING_REJECTED') {
       // User rejected — not a drop
       rule = 'INCOMING_REJECTED (user action, ignored)';
+    } else if (causeLabel === 'OUTGOING_CANCELED') {
+      // Caller hung up before other side answered — not a drop
+      rule = 'OUTGOING_CANCELED (caller hung up before answer, ignored)';
     }
     // ── Strong evidence of network drop ──
     // A call that was connected (offhook) but lasted less than 1 second

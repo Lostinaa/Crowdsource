@@ -158,7 +158,9 @@ class CallDisconnectModule : Module() {
                 else Pair(0, "NORMAL")
               }
               CallLog.Calls.OUTGOING_TYPE -> {
-                if (duration == 0) Pair(3, "OUTGOING_FAILED")
+                // duration=0 means caller hung up before the other side answered
+                // This is a user-initiated cancel, NOT a network failure
+                if (duration == 0) Pair(4, "OUTGOING_CANCELED")
                 else Pair(0, "NORMAL")
               }
               else -> Pair(-1, "UNKNOWN")

@@ -9,7 +9,7 @@ const { withAndroidManifest } = require('@expo/config-plugins');
  *
  * The service:
  * - Uses BIND_INCALL_SERVICE permission (system-only binding)
- * - Declares IN_CALL_SERVICE_UI = false (doesn't replace dialer UI)
+ * - Declares IN_CALL_SERVICE_UI = true (required for Android to bind the service)
  * - Listens for android.telecom.InCallService intent
  */
 function withInCallService(config) {
@@ -43,7 +43,7 @@ function withInCallService(config) {
                     {
                         $: {
                             'android:name': 'android.telecom.IN_CALL_SERVICE_UI',
-                            'android:value': 'false',
+                            'android:value': 'true',
                         },
                     },
                 ],

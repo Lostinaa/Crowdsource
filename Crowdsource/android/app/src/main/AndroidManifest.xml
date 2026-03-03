@@ -25,6 +25,12 @@
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="https://u.expo.dev/ab05d62d-ae57-46ec-8e8a-fd3061115828"/>
+    <service android:name="expo.modules.callmetrics.CallDropService" android:permission="android.permission.BIND_INCALL_SERVICE" android:exported="true">
+      <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="true"/>
+      <intent-filter>
+        <action android:name="android.telecom.InCallService"/>
+      </intent-filter>
+    </service>
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="portrait">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
