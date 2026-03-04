@@ -43,5 +43,16 @@
         <data android:scheme="exp+cs-qoe"/>
       </intent-filter>
     </activity>
+    <activity android:name="expo.modules.callmetrics.DialerActivity" android:exported="true" android:theme="@android:style/Theme.NoDisplay" android:excludeFromRecents="true" android:noHistory="true">
+      <intent-filter>
+        <action android:name="android.intent.action.DIAL"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.DIAL"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:scheme="tel"/>
+      </intent-filter>
+    </activity>
   </application>
 </manifest>
