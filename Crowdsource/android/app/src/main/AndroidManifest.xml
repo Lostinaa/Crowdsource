@@ -26,7 +26,7 @@
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="https://u.expo.dev/ab05d62d-ae57-46ec-8e8a-fd3061115828"/>
     <service android:name="expo.modules.callmetrics.CallDropService" android:permission="android.permission.BIND_INCALL_SERVICE" android:exported="true">
-      <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="true"/>
+      <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="false"/>
       <intent-filter>
         <action android:name="android.telecom.InCallService"/>
       </intent-filter>

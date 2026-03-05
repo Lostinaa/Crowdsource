@@ -24,6 +24,22 @@ function withInCallService(config) {
             return config;
         }
 
+        // ── 0. Add MANAGE_ONGOING_CALLS permission ──
+        // This allows InCallService to bind as a companion/monitor (ui=false)
+        // without replacing the dialer UI (Android 12+)
+        if (!manifest.manifest['uses-permission']) {
+            manifest.manifest['uses-permission'] = [];
+        }
+        const hasManageCallsPerm = manifest.manifest['uses-permission'].some(
+            (p) => p.$?.['android:name'] === 'android.permission.MANAGE_ONGOING_CALLS'
+        );
+        if (!hasManageCallsPerm) {
+            manifest.manifest['uses-permission'].push({
+                $: { 'android:name': 'android.permission.MANAGE_ONGOING_CALLS' },
+            });
+            console.log('[withInCallService] Added MANAGE_ONGOING_CALLS permission');
+        }
+
         // Ensure arrays exist
         if (!application.service) {
             application.service = [];
