@@ -1,11 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+  <uses-permission android:name="android.permission.CALL_PHONE"/>
   <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.MANAGE_ONGOING_CALLS"/>
   <uses-permission android:name="android.permission.READ_CALL_LOG"/>
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
   <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
   <queries>
@@ -26,7 +29,7 @@
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="https://u.expo.dev/ab05d62d-ae57-46ec-8e8a-fd3061115828"/>
     <service android:name="expo.modules.callmetrics.CallDropService" android:permission="android.permission.BIND_INCALL_SERVICE" android:exported="true">
-      <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="false"/>
+      <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="true"/>
       <intent-filter>
         <action android:name="android.telecom.InCallService"/>
       </intent-filter>
@@ -54,5 +57,6 @@
         <data android:scheme="tel"/>
       </intent-filter>
     </activity>
+    <activity android:name="expo.modules.callmetrics.InCallActivity" android:exported="false" android:launchMode="singleTask" android:excludeFromRecents="true" android:showOnLockScreen="true" android:turnScreenOn="true" android:taskAffinity="expo.modules.callmetrics.incall" android:theme="@android:style/Theme.NoTitleBar.Fullscreen"/>
   </application>
 </manifest>

@@ -46,10 +46,16 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="voice"
         options={{
-          title: 'Voice',
+          title: 'Calls',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="call-outline" size={size} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="dialer"
+        options={{
+          href: null, // Hidden — content accessed via Calls tab
         }}
       />
       <Tabs.Screen

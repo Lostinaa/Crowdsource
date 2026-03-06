@@ -1,7 +1,14 @@
 package expo.modules.callmetrics
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.telecom.Call
+import android.telecom.CallAudioState
 import android.telecom.DisconnectCause
 import android.telecom.InCallService
 import android.util.Log
@@ -12,13 +19,14 @@ import android.util.Log
  * (LOCAL / REMOTE / ERROR / MISSED / REJECTED / etc.) and forwards it to
  * CallDropBridgeModule via a static callback.
  *
- * This service does NOT replace the dialer UI — it runs alongside it.
- * The user must grant the app a telecom role ("Allow teleCrowd to manage calls?").
+ * Also launches InCallActivity to provide the required in-call UI.
  */
 class CallDropService : InCallService() {
 
     companion object {
         private const val TAG = "CallDropService"
+        private const val CHANNEL_ID = "incall_channel"
+        private const val NOTIFICATION_ID = 42
 
         /**
          * Static callback set by CallDropBridgeModule.
@@ -30,13 +38,36 @@ class CallDropService : InCallService() {
             causeDescription: String,
             callDurationMs: Long
         ) -> Unit)? = null
+
+        /** Current active call — used by InCallActivity for call control */
+        var currentCall: Call? = null
+
+        /** Current service instance — used by InCallActivity for audio control */
+        var currentService: CallDropService? = null
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        currentService = this
+        createNotificationChannel()
+        Log.d(TAG, "CallDropService created")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        currentService = null
+        Log.d(TAG, "CallDropService destroyed")
     }
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
-        Log.d(TAG, "Call added — attaching callback")
+        currentCall = call
+        Log.d(TAG, "Call added — attaching callback, launching UI")
 
         val callStart = System.currentTimeMillis()
+
+        // Launch the in-call activity
+        launchInCallActivity(call)
 
         call.registerCallback(object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
@@ -71,6 +102,7 @@ class CallDropService : InCallService() {
                     }
 
                     call.unregisterCallback(this)
+                    cancelNotification()
                 }
             }
         })
@@ -78,7 +110,89 @@ class CallDropService : InCallService() {
 
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)
+        currentCall = null
+        cancelNotification()
         Log.d(TAG, "Call removed")
+    }
+
+    private fun launchInCallActivity(call: Call) {
+        try {
+            val intent = Intent(this, InCallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to launch InCallActivity: ${e.message}")
+        }
+
+        // Also show ongoing notification for background control
+        showOngoingNotification(call)
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Ongoing Calls",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Shows notification during active calls"
+                setSound(null, null)
+            }
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun showOngoingNotification(call: Call) {
+        try {
+            val handle = call.details?.handle
+            val number = handle?.schemeSpecificPart ?: "Unknown"
+
+            val intent = Intent(this, InCallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                this, 0, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val isIncoming = call.state == Call.STATE_RINGING
+            val title = if (isIncoming) "Incoming Call" else "Ongoing Call"
+            val text = number
+
+            val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Notification.Builder(this, CHANNEL_ID)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(this)
+            }
+
+            val notification = builder
+                .setSmallIcon(android.R.drawable.ic_menu_call)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .setCategory(Notification.CATEGORY_CALL)
+                .build()
+
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.notify(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to show notification: ${e.message}")
+        }
+    }
+
+    private fun cancelNotification() {
+        try {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.cancel(NOTIFICATION_ID)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to cancel notification: ${e.message}")
+        }
     }
 
     private fun codeToLabel(code: Int): String {

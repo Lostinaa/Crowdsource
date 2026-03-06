@@ -1,6 +1,8 @@
 import { View, Text, StyleSheet, Button, Alert, Platform, PermissionsAndroid, ScrollView, Linking, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useRef } from 'react';
 import { useQoE } from '../../src/context/QoEContext';
+import { RecentsView, DialpadView } from './dialer';
 import { theme } from '../../src/constants/theme';
 import ScreenHeader from '../../src/components/ScreenHeader';
 import BrandedButton from '../../src/components/BrandedButton';
@@ -495,94 +497,109 @@ export default function VoiceScreen() {
     }
   };
 
+  const [showDialpad, setShowDialpad] = useState(false);
+  const [metricsExpanded, setMetricsExpanded] = useState(false);
+
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Voice Monitor" />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.contentContainer}>
+      <ScreenHeader title="Calls" />
 
-
-        <View style={styles.statusBox}>
-          <Text style={styles.statusTitle}>Status</Text>
-          <Text style={[styles.statusText, isListening && { color: theme.colors.success }]}>
-            {isListening ? '🟢 Capturing call events' : '⚪ Capture stopped'}
-          </Text>
+      {/* ── QoE Capture Banner ── */}
+      <TouchableOpacity
+        style={[styles.captureBanner, isListening && styles.captureBannerActive]}
+        onPress={() => setMetricsExpanded(!metricsExpanded)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.captureBannerRow}>
+          <View style={styles.captureBannerLeft}>
+            <View style={[styles.statusDot, isListening && styles.statusDotActive]} />
+            <Text style={styles.captureBannerText}>
+              {isListening ? 'Capturing call metrics' : 'Call metrics paused'}
+            </Text>
+          </View>
+          {!isListening ? (
+            <TouchableOpacity
+              style={styles.captureStartBtn}
+              onPress={handleStart}
+            >
+              <Text style={styles.captureStartBtnText}>Start</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.captureStopBtn}
+              onPress={handleStop}
+            >
+              <Text style={styles.captureStopBtnText}>Stop</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        <View style={styles.buttonsRow}>
-          <BrandedButton
-            title="Capture Metrics"
-            onPress={handleStart}
-            disabled={isListening}
-            style={{ flex: 1 }}
-            textStyle={{}}
+        {/* Expandable metrics */}
+        {metricsExpanded && (
+          <View style={styles.metricsExpanded}>
+            <View style={styles.countersRow}>
+              <View style={styles.counterItem}>
+                <Text style={styles.counterValue}>{metrics.voice.attempts}</Text>
+                <Text style={styles.counterLabel}>Attempts</Text>
+              </View>
+              <View style={styles.counterItem}>
+                <Text style={styles.counterValue}>{metrics.voice.setupOk}</Text>
+                <Text style={styles.counterLabel}>Connected</Text>
+              </View>
+              <View style={styles.counterItem}>
+                <Text style={[styles.counterValue, { color: theme.colors.success }]}>{metrics.voice.completed}</Text>
+                <Text style={styles.counterLabel}>Completed</Text>
+              </View>
+              <View style={styles.counterItem}>
+                <Text style={[styles.counterValue, { color: metrics.voice.dropped > 0 ? theme.colors.danger : theme.colors.text.primary }]}>{metrics.voice.dropped}</Text>
+                <Text style={styles.counterLabel}>Dropped</Text>
+              </View>
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>CSSR</Text>
+              <Text style={styles.metricValue}>{formatPercent(scores.voice.cssr)}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>CDR</Text>
+              <Text style={[styles.metricValue, scores.voice.cdr > 0 && { color: theme.colors.danger }]}>{formatPercent(scores.voice.cdr)}</Text>
+            </View>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>MOS</Text>
+              <Text style={styles.metricValue}>
+                {signalMos > 0 ? formatMOS(signalMos) : (scores.voice.mosAvg !== null && scores.voice.mosAvg !== undefined ? formatMOS(scores.voice.mosAvg) : '--')}
+              </Text>
+            </View>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      {/* ── Main content: RecentsView ── */}
+      <RecentsView />
+
+      {/* ── FAB Dialpad ── */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowDialpad(true)}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="keypad" size={24} color="#fff" />
+      </TouchableOpacity>
+
+      {/* ── Dialpad Bottom Sheet ── */}
+      {showDialpad && (
+        <>
+          <TouchableOpacity
+            style={styles.dialpadBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowDialpad(false)}
           />
-          <BrandedButton
-            title="Stop Capturing"
-            onPress={handleStop}
-            disabled={!isListening}
-            variant="outline"
-            style={{ flex: 1 }}
-            textStyle={{}}
-          />
-        </View>
-
-        <View style={styles.metricsBox}>
-          <Text style={styles.sectionTitle}>Voice Metrics</Text>
-
-          {/* Raw Call Counts — clearly show dynamic updates */}
-          <View style={styles.countersRow}>
-            <View style={styles.counterItem}>
-              <Text style={styles.counterValue}>{metrics.voice.attempts}</Text>
-              <Text style={styles.counterLabel}>Attempts</Text>
-            </View>
-            <View style={styles.counterItem}>
-              <Text style={styles.counterValue}>{metrics.voice.setupOk}</Text>
-              <Text style={styles.counterLabel}>Connected</Text>
-            </View>
-            <View style={styles.counterItem}>
-              <Text style={[styles.counterValue, { color: theme.colors.success }]}>{metrics.voice.completed}</Text>
-              <Text style={styles.counterLabel}>Completed</Text>
-            </View>
-            <View style={styles.counterItem}>
-              <Text style={[styles.counterValue, { color: metrics.voice.dropped > 0 ? theme.colors.danger : theme.colors.text.primary }]}>{metrics.voice.dropped}</Text>
-              <Text style={styles.counterLabel}>Dropped</Text>
-            </View>
+          <View style={styles.dialpadSheet}>
+            <View style={styles.sheetHandle} />
+            <DialpadView />
           </View>
-
-          <View style={styles.divider} />
-
-          {/* KPI Ratios */}
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>CSSR</Text>
-            <Text style={styles.metricValue}>
-              {formatPercent(scores.voice.cssr)}
-            </Text>
-          </View>
-
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>CDR</Text>
-            <Text style={[styles.metricValue, scores.voice.cdr > 0 && { color: theme.colors.danger }]}>
-              {formatPercent(scores.voice.cdr)}
-            </Text>
-          </View>
-
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Avg Setup Time</Text>
-            <Text style={styles.metricValue}>
-              {formatTime(scores.voice.cstAvg)}
-            </Text>
-          </View>
-
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Estimated MOS</Text>
-            <Text style={styles.metricValue}>
-              {signalMos > 0 ? formatMOS(signalMos) : (scores.voice.mosAvg !== null && scores.voice.mosAvg !== undefined ? formatMOS(scores.voice.mosAvg) : '--')}
-            </Text>
-          </View>
-
-        </View>
-
-      </ScrollView>
+        </>
+      )}
     </View>
   );
 }
@@ -722,6 +739,134 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 4,
   },
-});
 
+  // Capture Banner
+  captureBanner: {
+    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    marginBottom: 4,
+    backgroundColor: theme.colors.background.card,
+    borderRadius: theme.borderRadius.lg,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+    ...theme.shadows.sm,
+  },
+  captureBannerActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: '#f0faf0',
+  },
+  captureBannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  captureBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.text.light,
+  },
+  statusDotActive: {
+    backgroundColor: theme.colors.success,
+  },
+  captureBannerText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: theme.colors.text.secondary,
+  },
+  captureStartBtn: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.full,
+  },
+  captureStartBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  captureStopBtn: {
+    backgroundColor: theme.colors.background.secondary,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  captureStopBtnText: {
+    color: theme.colors.text.secondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  metricsExpanded: {
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border.light,
+  },
+
+  // FAB
+  fab: {
+    position: 'absolute',
+    right: 24,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#136dec',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#136dec',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  fabIcon: {
+    fontSize: 24,
+    color: '#fff',
+  },
+
+  // Dialpad bottom sheet
+  dialpadBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    zIndex: 99,
+  },
+  dialpadSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+    paddingBottom: 24,
+    zIndex: 100,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#d1d5db',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 8,
+  },
+});
 

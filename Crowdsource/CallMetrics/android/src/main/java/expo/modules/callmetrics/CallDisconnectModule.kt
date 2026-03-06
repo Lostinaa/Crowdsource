@@ -93,6 +93,106 @@ class CallDisconnectModule : Module() {
       isFirstChange = true
       true
     }
+
+    AsyncFunction("getRecentCalls") { limit: Int ->
+      val context = appContext.reactContext
+        ?: return@AsyncFunction emptyList<Map<String, Any?>>()
+
+      if (ContextCompat.checkSelfPermission(
+          context,
+          Manifest.permission.READ_CALL_LOG
+        ) != PackageManager.PERMISSION_GRANTED
+      ) {
+        return@AsyncFunction emptyList<Map<String, Any?>>()
+      }
+
+      val calls = mutableListOf<Map<String, Any?>>()
+      val cursor = context.contentResolver.query(
+        CallLog.Calls.CONTENT_URI,
+        arrayOf(
+          CallLog.Calls.CACHED_NAME,
+          CallLog.Calls.NUMBER,
+          CallLog.Calls.TYPE,
+          CallLog.Calls.DATE,
+          CallLog.Calls.DURATION
+        ),
+        null, null,
+        "${CallLog.Calls.DATE} DESC"
+      )
+
+      cursor?.use {
+        val nameIdx = it.getColumnIndex(CallLog.Calls.CACHED_NAME)
+        val numberIdx = it.getColumnIndex(CallLog.Calls.NUMBER)
+        val typeIdx = it.getColumnIndex(CallLog.Calls.TYPE)
+        val dateIdx = it.getColumnIndex(CallLog.Calls.DATE)
+        val durationIdx = it.getColumnIndex(CallLog.Calls.DURATION)
+
+        var count = 0
+        while (it.moveToNext() && count < limit) {
+          val type = it.getInt(typeIdx)
+          val typeName = when (type) {
+            CallLog.Calls.INCOMING_TYPE -> "INCOMING"
+            CallLog.Calls.OUTGOING_TYPE -> "OUTGOING"
+            CallLog.Calls.MISSED_TYPE -> "MISSED"
+            CallLog.Calls.REJECTED_TYPE -> "REJECTED"
+            CallLog.Calls.BLOCKED_TYPE -> "BLOCKED"
+            else -> "UNKNOWN"
+          }
+
+          val dateMs = it.getLong(dateIdx)
+          val isoDate = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+            .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+            .format(java.util.Date(dateMs))
+
+          calls.add(mapOf(
+            "name" to (if (nameIdx >= 0) it.getString(nameIdx) else null),
+            "number" to (if (numberIdx >= 0) it.getString(numberIdx) else ""),
+            "type" to typeName,
+            "date" to isoDate,
+            "duration" to (if (durationIdx >= 0) it.getInt(durationIdx) else 0)
+          ))
+          count++
+        }
+      }
+
+      calls
+    }
+
+    AsyncFunction("placeCall") { phoneNumber: String ->
+      val context = appContext.reactContext
+        ?: return@AsyncFunction false
+
+      // Check CALL_PHONE permission
+      if (ContextCompat.checkSelfPermission(
+          context,
+          Manifest.permission.CALL_PHONE
+        ) != PackageManager.PERMISSION_GRANTED
+      ) {
+        return@AsyncFunction false
+      }
+
+      try {
+        val telecomManager = context.getSystemService(android.content.Context.TELECOM_SERVICE)
+          as? android.telecom.TelecomManager
+        if (telecomManager != null) {
+          val uri = android.net.Uri.fromParts("tel", phoneNumber, null)
+          val extras = android.os.Bundle()
+          telecomManager.placeCall(uri, extras)
+          true
+        } else {
+          // Fallback: use ACTION_CALL intent
+          val intent = android.content.Intent(android.content.Intent.ACTION_CALL).apply {
+            data = android.net.Uri.parse("tel:$phoneNumber")
+            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+          }
+          context.startActivity(intent)
+          true
+        }
+      } catch (e: Exception) {
+        android.util.Log.e("CallDisconnectModule", "placeCall failed", e)
+        false
+      }
+    }
   }
 
   /**

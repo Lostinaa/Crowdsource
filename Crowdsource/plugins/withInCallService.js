@@ -3,16 +3,11 @@ const { withAndroidManifest } = require('@expo/config-plugins');
 /**
  * Expo Config Plugin: withInCallService
  *
- * Injects the CallDropService (InCallService) and DialerActivity into
- * AndroidManifest.xml during `expo prebuild` / `eas build`.
- *
- * Components added:
- * 1. CallDropService — InCallService that receives DisconnectCause events
- *    - BIND_INCALL_SERVICE permission (system-only binding)
- *    - IN_CALL_SERVICE_UI = true (required for binding as default dialer)
- * 2. DialerActivity — Required for ROLE_DIALER qualification
- *    - Handles android.intent.action.DIAL
- *    - Forwards to system dialer and finishes immediately
+ * Injects InCallService components into AndroidManifest.xml:
+ * 1. CallDropService — receives DisconnectCause events (IN_CALL_SERVICE_UI=true)
+ * 2. DialerActivity — handles ACTION_DIAL (required for ROLE_DIALER qualification)
+ * 3. InCallActivity — provides the in-call UI (hangup, speaker, mute, answer/decline)
+ * 4. MANAGE_ONGOING_CALLS + USE_FULL_SCREEN_INTENT permissions
  */
 function withInCallService(config) {
     return withAndroidManifest(config, async (config) => {
@@ -24,21 +19,24 @@ function withInCallService(config) {
             return config;
         }
 
-        // ── 0. Add MANAGE_ONGOING_CALLS permission ──
-        // This allows InCallService to bind as a companion/monitor (ui=false)
-        // without replacing the dialer UI (Android 12+)
+        // ── 0. Add required permissions ──
         if (!manifest.manifest['uses-permission']) {
             manifest.manifest['uses-permission'] = [];
         }
-        const hasManageCallsPerm = manifest.manifest['uses-permission'].some(
-            (p) => p.$?.['android:name'] === 'android.permission.MANAGE_ONGOING_CALLS'
-        );
-        if (!hasManageCallsPerm) {
-            manifest.manifest['uses-permission'].push({
-                $: { 'android:name': 'android.permission.MANAGE_ONGOING_CALLS' },
-            });
-            console.log('[withInCallService] Added MANAGE_ONGOING_CALLS permission');
-        }
+        const addPermission = (name) => {
+            const exists = manifest.manifest['uses-permission'].some(
+                (p) => p.$?.['android:name'] === name
+            );
+            if (!exists) {
+                manifest.manifest['uses-permission'].push({
+                    $: { 'android:name': name },
+                });
+                console.log(`[withInCallService] Added permission: ${name}`);
+            }
+        };
+        addPermission('android.permission.MANAGE_ONGOING_CALLS');
+        addPermission('android.permission.USE_FULL_SCREEN_INTENT');
+        addPermission('android.permission.CALL_PHONE');
 
         // Ensure arrays exist
         if (!application.service) {
@@ -64,7 +62,7 @@ function withInCallService(config) {
                     {
                         $: {
                             'android:name': 'android.telecom.IN_CALL_SERVICE_UI',
-                            'android:value': 'false',
+                            'android:value': 'true',
                         },
                     },
                 ],
@@ -130,6 +128,27 @@ function withInCallService(config) {
                 ],
             });
             console.log('[withInCallService] Added DialerActivity to AndroidManifest');
+        }
+
+        // ── 3. InCallActivity (in-call UI) ──
+        const inCallExists = application.activity.some(
+            (act) => act.$?.['android:name'] === 'expo.modules.callmetrics.InCallActivity'
+        );
+
+        if (!inCallExists) {
+            application.activity.push({
+                $: {
+                    'android:name': 'expo.modules.callmetrics.InCallActivity',
+                    'android:exported': 'false',
+                    'android:launchMode': 'singleTask',
+                    'android:excludeFromRecents': 'true',
+                    'android:showOnLockScreen': 'true',
+                    'android:turnScreenOn': 'true',
+                    'android:taskAffinity': 'expo.modules.callmetrics.incall',
+                    'android:theme': '@android:style/Theme.NoTitleBar.Fullscreen',
+                },
+            });
+            console.log('[withInCallService] Added InCallActivity to AndroidManifest');
         }
 
         return config;
