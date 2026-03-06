@@ -177,6 +177,8 @@ export default function VoiceScreen() {
   const inCallServiceSubRef = useRef<any>(null);
   // Whether InCallService provided the disconnect cause (takes priority over CallLog)
   const inCallServiceHandledRef = useRef(false);
+  // Store the last InCallService disconnect cause (covers timing race)
+  const lastInCallCauseRef = useRef<any>(null);
 
   // Call Metrics listener — only processes events relevant to real calls
   useEffect(() => {
@@ -241,15 +243,52 @@ export default function VoiceScreen() {
             cancelPendingClassification();
             pendingCallRef.current = { callDuration, rsrp, timestamp: now };
 
-            // Timeout fallback: if no disconnect event arrives within 4s, classify anyway
-            classifyTimeoutRef.current = setTimeout(() => {
-              const pending = pendingCallRef.current;
-              if (pending) {
-                console.log('[Voice] Disconnect event timeout — using fallback classification');
-                classifyCall(pending); // no disconnect param → timeout rules
-                pendingCallRef.current = null;
+            // Check if InCallService already fired BEFORE we got IDLE
+            const storedCause = lastInCallCauseRef.current;
+            if (storedCause) {
+              console.log('[Voice] InCallService cause was already stored — using it now');
+              lastInCallCauseRef.current = null;
+              inCallServiceHandledRef.current = true;
+
+              const causeLabel = storedCause.causeLabel || 'UNKNOWN';
+              let dropped = false;
+              let completed = false;
+              let rule = '';
+
+              if (causeLabel === 'ERROR' || causeLabel === 'OTHER') {
+                dropped = true;
+                rule = `InCallService(stored): ${causeLabel} — network/system failure`;
+              } else if (causeLabel === 'LOCAL' || causeLabel === 'REMOTE') {
+                completed = true;
+                rule = `InCallService(stored): ${causeLabel} — normal hangup`;
+              } else if (causeLabel === 'MISSED' || causeLabel === 'REJECTED' || causeLabel === 'CANCELED' || causeLabel === 'BUSY') {
+                rule = `InCallService(stored): ${causeLabel} — not connected, ignored`;
+              } else {
+                completed = true;
+                rule = `InCallService(stored): ${causeLabel} — defaulting to completed`;
               }
-            }, 4000);
+
+              console.log(`[Voice] Call classified via stored InCallService: ${dropped ? 'DROPPED' : completed ? 'COMPLETED' : 'IGNORED'} | Rule: ${rule}`);
+              if (dropped || completed) {
+                addVoiceSample({ callCompleted: completed, dropped });
+              }
+              addVoiceSample({
+                reasonCode: storedCause.causeCode,
+                reasonLabel: causeLabel,
+                reasonSource: 'incallservice',
+              });
+              pendingCallRef.current = null;
+            } else {
+              // Timeout fallback: if no disconnect event arrives within 4s, classify anyway
+              classifyTimeoutRef.current = setTimeout(() => {
+                const pending = pendingCallRef.current;
+                if (pending) {
+                  console.log('[Voice] Disconnect event timeout — using fallback classification');
+                  classifyCall(pending); // no disconnect param → timeout rules
+                  pendingCallRef.current = null;
+                }
+              }, 4000);
+            }
 
           } else if (callSetupStartTimeRef.current !== null) {
             // Ringing → idle (call never answered = failed setup, not a drop)
@@ -348,14 +387,14 @@ export default function VoiceScreen() {
 
               const pending = pendingCallRef.current;
               if (pending) {
-                // Cancel all fallback timers — we have the real cause
+                // pendingCallRef exists — process immediately
                 if (classifyTimeoutRef.current) {
                   clearTimeout(classifyTimeoutRef.current);
                   classifyTimeoutRef.current = null;
                 }
                 inCallServiceHandledRef.current = true;
+                lastInCallCauseRef.current = null;
 
-                // Use REAL DisconnectCause for classification
                 const causeLabel = payload?.causeLabel || 'UNKNOWN';
                 let dropped = false;
                 let completed = false;
@@ -379,15 +418,21 @@ export default function VoiceScreen() {
                 if (dropped || completed) {
                   addVoiceSample({ callCompleted: completed, dropped });
                 }
-
-                // Record the disconnect reason for analytics
                 addVoiceSample({
                   reasonCode: payload?.causeCode,
                   reasonLabel: causeLabel,
                   reasonSource: 'incallservice',
                 });
-
                 pendingCallRef.current = null;
+              } else {
+                // pendingCallRef not set yet — store for IDLE handler to pick up
+                console.log('[Voice] InCallService fired before IDLE — storing cause for later');
+                lastInCallCauseRef.current = {
+                  causeCode: payload?.causeCode,
+                  causeLabel: payload?.causeLabel,
+                  causeDescription: payload?.causeDescription,
+                  callDurationMs: payload?.callDurationMs,
+                };
               }
             });
             console.log('[Voice] InCallService (CallDropBridgeModule) listener registered');
@@ -401,36 +446,39 @@ export default function VoiceScreen() {
           try {
             await CallDisconnectModule.startListening();
             disconnectSubRef.current = CallDisconnectModule.addListener('CallDisconnectEvent', (payload) => {
-              console.log('[Voice] CallDisconnectEvent (CallLog) received:', payload);
+              console.log('[Voice] CallDisconnectEvent (CallLog) received — deferring 800ms for InCallService priority');
 
-              // Skip if InCallService already handled this call
-              if (inCallServiceHandledRef.current) {
-                console.log('[Voice] Skipping CallLog event — InCallService already classified this call');
-                inCallServiceHandledRef.current = false;
-                return;
-              }
-
-              // Fallback: use CallLog-based classification
-              const pending = pendingCallRef.current;
-              if (pending) {
-                if (classifyTimeoutRef.current) {
-                  clearTimeout(classifyTimeoutRef.current);
-                  classifyTimeoutRef.current = null;
+              // Delay slightly to give InCallService time to fire first
+              setTimeout(() => {
+                // Skip if InCallService already handled this call
+                if (inCallServiceHandledRef.current) {
+                  console.log('[Voice] Skipping CallLog event — InCallService already classified this call');
+                  inCallServiceHandledRef.current = false;
+                  return;
                 }
-                classifyCall(pending, {
-                  causeLabel: payload?.causeLabel,
-                  duration: payload?.duration,
-                });
-                pendingCallRef.current = null;
-              }
 
-              if (payload?.causeCode !== undefined || payload?.causeLabel) {
-                addVoiceSample({
-                  reasonCode: payload?.causeCode,
-                  reasonLabel: payload?.causeLabel || 'Unknown',
-                  reasonSource: payload?.source || 'calllog',
-                });
-              }
+                // Fallback: use CallLog-based classification
+                const pending = pendingCallRef.current;
+                if (pending) {
+                  if (classifyTimeoutRef.current) {
+                    clearTimeout(classifyTimeoutRef.current);
+                    classifyTimeoutRef.current = null;
+                  }
+                  classifyCall(pending, {
+                    causeLabel: payload?.causeLabel,
+                    duration: payload?.duration,
+                  });
+                  pendingCallRef.current = null;
+                }
+
+                if (payload?.causeCode !== undefined || payload?.causeLabel) {
+                  addVoiceSample({
+                    reasonCode: payload?.causeCode,
+                    reasonLabel: payload?.causeLabel || 'Unknown',
+                    reasonSource: payload?.source || 'calllog',
+                  });
+                }
+              }, 800);
             });
             console.log('[Voice] CallDisconnectModule (CallLog) started successfully');
           } catch (e) {
@@ -468,6 +516,7 @@ export default function VoiceScreen() {
       isActiveCallRef.current = false;
       callStartTimeRef.current = null;
       callSetupStartTimeRef.current = null;
+      lastInCallCauseRef.current = null;
       stopMosPolling();
       cancelPendingClassification();
 
@@ -819,11 +868,11 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#136dec',
+    backgroundColor: '#34C759',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 6,
-    shadowColor: '#136dec',
+    shadowColor: '#34C759',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../src/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const DIALPAD_BTN_SIZE = Math.min((SCREEN_WIDTH - 140) / 3, 64);
+const DIALPAD_BTN_SIZE = (SCREEN_WIDTH - 120) / 3;
 
 // ── Dialpad button definitions ──
 const KEYPAD = [
