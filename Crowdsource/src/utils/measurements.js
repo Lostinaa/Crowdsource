@@ -275,7 +275,7 @@ export const runHttpUploadTest = async ({ addHttpSample, silent = false }) => {
             'https://httpbin.org/post',
             'https://postman-echo.com/post',
         ];
-
+``
         let response = null;
         for (const url of uploadUrls) {
             try {
