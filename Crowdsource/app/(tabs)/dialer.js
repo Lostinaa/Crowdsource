@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../src/constants/theme';
+import { setCallInitiatedAt } from '../../src/utils/callState';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DIALPAD_BTN_SIZE = (SCREEN_WIDTH - 120) / 3;
@@ -92,6 +93,9 @@ async function makeCall(number) {
     if (!number) return;
     const cleanNumber = number.replace(/[^0-9+*#]/g, '');
     if (!cleanNumber) return;
+
+    // Record initiation timestamp for setup time calculation in voice.tsx
+    setCallInitiatedAt(Date.now());
 
     if (Platform.OS === 'android') {
         const { PermissionsAndroid } = require('react-native');

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useQoE } from '../../src/context/QoEContext';
 import { RecentsView, DialpadView } from './dialer';
 import { theme } from '../../src/constants/theme';
+import { getCallInitiatedAt, clearCallInitiatedAt } from '../../src/utils/callState';
 import ScreenHeader from '../../src/components/ScreenHeader';
 import BrandedButton from '../../src/components/BrandedButton';
 import CallMetrics, {
@@ -37,6 +38,8 @@ export default function VoiceScreen() {
   const [signalMos, setSignalMos] = useState(0);
   const callStartTimeRef = useRef(null);
   const callSetupStartTimeRef = useRef(null);
+  // Track incoming vs outgoing calls — only outgoing calls count for QoE
+  const isIncomingCallRef = useRef(false);
   const mosIntervalRef = useRef(null);
 
   // Enhanced drop detection: deferred classification context
@@ -64,25 +67,40 @@ export default function VoiceScreen() {
     mosIntervalRef.current = setInterval(async () => {
       try {
         const diagnostics = await DeviceDiagnosticModule.getFullDiagnostics();
-        if (diagnostics && diagnostics.rsrp) {
-          const rsrp = parseInt(diagnostics.rsrp, 10);
-          if (!isNaN(rsrp)) {
-            // Calculate MOS based on RSRP (Approximation)
-            // RSRP >= -80: Excellent (4.4)
-            // RSRP >= -90: Good (4.0)
-            // RSRP >= -100: Fair (3.5)
-            // RSRP >= -110: Poor (3.0)
-            // RSRP < -110: Bad (2.0)
-            let estimatedMos = 2.0;
-            if (rsrp >= -80) estimatedMos = 4.4;
-            else if (rsrp >= -90) estimatedMos = 4.0;
-            else if (rsrp >= -100) estimatedMos = 3.5;
-            else if (rsrp >= -110) estimatedMos = 3.0;
+        if (!diagnostics) return;
 
-            console.log(`[Voice] RSRP: ${rsrp} dBm -> Est. MOS: ${estimatedMos}`);
-            setSignalMos(estimatedMos);
-            addVoiceSample({ mos: estimatedMos });
+        let estimatedMos: number | null = null;
+
+        // Try RSRP first (LTE preferred metric)
+        const rsrp = diagnostics.rsrp ? parseInt(diagnostics.rsrp, 10) : NaN;
+        if (!isNaN(rsrp)) {
+          // RSRP → MOS mapping (approximation)
+          if (rsrp >= -80) estimatedMos = 4.4;
+          else if (rsrp >= -90) estimatedMos = 4.0;
+          else if (rsrp >= -100) estimatedMos = 3.5;
+          else if (rsrp >= -110) estimatedMos = 3.0;
+          else estimatedMos = 2.0;
+          console.log(`[Voice] RSRP: ${rsrp} dBm -> Est. MOS: ${estimatedMos}`);
+        }
+
+        // Fallback to RSSI if RSRP unavailable
+        if (estimatedMos === null) {
+          const rssi = diagnostics.rssi ? parseInt(diagnostics.rssi, 10) : NaN;
+          if (!isNaN(rssi)) {
+            if (rssi >= -65) estimatedMos = 4.4;
+            else if (rssi >= -75) estimatedMos = 4.0;
+            else if (rssi >= -85) estimatedMos = 3.5;
+            else if (rssi >= -95) estimatedMos = 3.0;
+            else estimatedMos = 2.0;
+            console.log(`[Voice] RSSI fallback: ${rssi} dBm -> Est. MOS: ${estimatedMos}`);
+          } else {
+            console.warn('[Voice] No RSRP or RSSI available — skipping MOS sample');
           }
+        }
+
+        if (estimatedMos !== null) {
+          setSignalMos(estimatedMos);
+          addVoiceSample({ mos: estimatedMos });
         }
       } catch (e) {
         console.warn('[Voice] Failed to poll signal for MOS:', e);
@@ -192,22 +210,29 @@ export default function VoiceScreen() {
         console.log('[Voice] Call state changed:', payload.state, payload);
 
         if (payload.state === 'ringing') {
-          // Incoming/outgoing call detected — record attempt
+          // RINGING fires for INCOMING calls only on most Android ROMs.
+          // Outgoing calls go directly to OFFHOOK.
+          // Mark this as incoming — incoming calls are excluded from QoE metrics.
+          isIncomingCallRef.current = true;
           callSetupStartTimeRef.current = now;
-          isActiveCallRef.current = false; // not yet connected
-          addVoiceSample({ attempt: true });
+          isActiveCallRef.current = false;
+          console.log('[Voice] Incoming call detected (RINGING) — will NOT count in QoE');
 
         } else if (payload.state === 'offhook') {
-          // Call was answered/connected
-          if (callSetupStartTimeRef.current !== null) {
-            // Normal path: ringing → offhook
-            const setupTime = now - callSetupStartTimeRef.current;
-            addVoiceSample({ setupSuccessful: true, setupTimeMs: setupTime });
+          if (isIncomingCallRef.current) {
+            // Incoming call was answered — do NOT count in QoE
+            console.log('[Voice] Incoming call answered — excluded from QoE metrics');
             callSetupStartTimeRef.current = null;
           } else {
-            // offhook without prior ringing (e.g. outgoing call skipped ringing event on some ROMs)
-            // We DO NOT invent a fake setupTimeMs — just record that setup succeeded without a time.
-            addVoiceSample({ attempt: true, setupSuccessful: true });
+            // OUTGOING call — this IS counted in QoE
+            // Compute setup time from when user pressed call in dialer to now (OFFHOOK)
+            const initiatedAt = getCallInitiatedAt();
+            const setupTimeMs = initiatedAt ? (now - initiatedAt) : 0;
+            clearCallInitiatedAt();
+
+            callSetupStartTimeRef.current = now;
+            addVoiceSample({ attempt: true, setupSuccessful: true, setupTimeMs });
+            console.log(`[Voice] Outgoing call detected — setupTime: ${setupTimeMs}ms — counted in QoE`);
           }
           callStartTimeRef.current = now;
           isActiveCallRef.current = true;
@@ -219,7 +244,10 @@ export default function VoiceScreen() {
           stopMosPolling();
           setSignalMos(0);
 
-          if (isActiveCallRef.current && callStartTimeRef.current !== null) {
+          if (isIncomingCallRef.current) {
+            // Incoming call ended — skip QoE classification entirely
+            console.log('[Voice] Incoming call ended — not included in QoE');
+          } else if (isActiveCallRef.current && callStartTimeRef.current !== null) {
             // Real call ending — snapshot context for deferred classification
             const callDuration = now - callStartTimeRef.current;
 
@@ -299,6 +327,7 @@ export default function VoiceScreen() {
           callStartTimeRef.current = null;
           callSetupStartTimeRef.current = null;
           isActiveCallRef.current = false;
+          isIncomingCallRef.current = false;
         }
       }
     );

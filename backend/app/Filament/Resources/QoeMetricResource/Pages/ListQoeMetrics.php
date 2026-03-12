@@ -93,6 +93,7 @@ class ListQoeMetrics extends ListRecords
                             // Browsing
                             'Browsing Requests',
                             'Browsing Completed',
+                            'Browsing Success Ratio (%)',
                             'Avg Browsing Duration (ms)',
                             'Avg DNS Resolution (ms)',
                             'Avg Browsing Throughput (Kbps)',
@@ -102,6 +103,7 @@ class ListQoeMetrics extends ListRecords
                             // Streaming
                             'Streaming Requests',
                             'Streaming Completed',
+                            'Streaming Success Ratio (%)',
                             'Avg Streaming MOS',
                             'Avg Streaming Setup (ms)',
                             'Avg Streaming Throughput (Kbps)',
@@ -114,10 +116,12 @@ class ListQoeMetrics extends ListRecords
                             // HTTP DL/UL
                             'HTTP DL Requests',
                             'HTTP DL Completed',
+                            'HTTP DL Success Ratio (%)',
                             'Avg DL Throughput (Mbps)',
                             'DL Throughputs (Mbps)',
                             'HTTP UL Requests',
                             'HTTP UL Completed',
+                            'HTTP UL Success Ratio (%)',
                             'Avg UL Throughput (Mbps)',
                             'UL Throughputs (Mbps)',
                             // FTP DL/UL
@@ -224,6 +228,9 @@ class ListQoeMetrics extends ListRecords
                                 // Browsing
                                 $data['browsing']['requests'] ?? 0,
                                 $data['browsing']['completed'] ?? 0,
+                                ($data['browsing']['requests'] ?? 0) > 0
+                                    ? round((($data['browsing']['completed'] ?? 0) / ($data['browsing']['requests'])) * 100, 1)
+                                    : '',
                                 $avg($data['browsing']['durations'] ?? []),
                                 $avg($data['browsing']['dnsResolutionTimes'] ?? []),
                                 $avg($data['browsing']['throughputs'] ?? []),
@@ -233,6 +240,9 @@ class ListQoeMetrics extends ListRecords
                                 // Streaming
                                 $data['streaming']['requests'] ?? 0,
                                 $data['streaming']['completed'] ?? 0,
+                                ($data['streaming']['requests'] ?? 0) > 0
+                                    ? round((($data['streaming']['completed'] ?? 0) / ($data['streaming']['requests'])) * 100, 1)
+                                    : '',
                                 $avg($data['streaming']['mosSamples'] ?? []),
                                 $avg($data['streaming']['setupTimes'] ?? []),
                                 $avg($data['streaming']['throughputs'] ?? []),
@@ -245,10 +255,16 @@ class ListQoeMetrics extends ListRecords
                                 // HTTP DL/UL
                                 $data['http']['dl']['requests'] ?? 0,
                                 $data['http']['dl']['completed'] ?? 0,
+                                ($data['http']['dl']['requests'] ?? 0) > 0
+                                    ? round((($data['http']['dl']['completed'] ?? 0) / ($data['http']['dl']['requests'])) * 100, 1)
+                                    : '',
                                 $avg($data['http']['dl']['throughputs'] ?? []),
                                 $arrToStr($data['http']['dl']['throughputs'] ?? []),
                                 $data['http']['ul']['requests'] ?? 0,
                                 $data['http']['ul']['completed'] ?? 0,
+                                ($data['http']['ul']['requests'] ?? 0) > 0
+                                    ? round((($data['http']['ul']['completed'] ?? 0) / ($data['http']['ul']['requests'])) * 100, 1)
+                                    : '',
                                 $avg($data['http']['ul']['throughputs'] ?? []),
                                 $arrToStr($data['http']['ul']['throughputs'] ?? []),
                                 // FTP DL/UL
