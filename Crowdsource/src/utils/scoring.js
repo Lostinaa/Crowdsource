@@ -318,12 +318,13 @@ const calculateLatencyScore = (latencyMetrics) => {
   };
 };
 
-const normalizeScore = (score, appliedWeight, expectedWeight) => {
-  if (score === null || appliedWeight === 0) return null;
-  if (appliedWeight === expectedWeight) return score;
-  // scale score proportionally to how much of the weight was populated
-  return score * (appliedWeight / expectedWeight);
-};
+// Excel QoE Calculator formula:
+// Each metric's contribution = RAW * weight_in_service * weight_in_category * weight_of_category * 100
+// Category score = SUM of all metric contributions in that category
+// Overall = SUM of all category scores
+//
+// Example: CSSR = 100% → RAW = (1.0 - 0.9) / (1.0 - 0.9) = 1.0
+// Contribution = 1.0 * 0.333 * 1.0 * 0.4 * 100 = 13.33 points
 
 export const calculateScores = (metrics) => {
   const voice = calculateVoiceScore(metrics?.voice);
@@ -333,50 +334,78 @@ export const calculateScores = (metrics) => {
   const social = calculateSocialScore(metrics?.data?.social);
   const latency = calculateLatencyScore(metrics?.data?.latency);
 
-  // Data component weights per QoE Calculator table:
-  // Video Streaming: 15%, Data Testing: 30%, Latency: 15%, Browsing: 25%, Social: 15%
-  const dataComponents = [
-    { score: normalizeScore(http.score, http.appliedWeight, 0.30), weight: 0.30 },      // Data Testing (HTTP/FTP)
-    { score: normalizeScore(browsing.score, browsing.appliedWeight, 0.25), weight: 0.25 }, // Browsing
-    { score: normalizeScore(streaming.score, streaming.appliedWeight, 0.15), weight: 0.15 }, // Video Streaming
-    { score: normalizeScore(latency.score, latency.appliedWeight, 0.15), weight: 0.15 },     // Latency & Interactivity
-    { score: normalizeScore(social.score, social.appliedWeight, 0.15), weight: 0.15 },      // Social Media
-  ].filter((entry) => entry.score !== null);
+  // ── Voice contribution (max ~40 points) ──
+  // Each voice metric: RAW * weight_in_service * 1.0 (telephony=100%) * 0.4 (telephony weight) * 100
+  const voiceContribution = voice.score !== null
+    ? voice.score * OVERALL_WEIGHTS.voice * 100
+    : null;
 
-  const dataWeighted = weightedScore(dataComponents);
+  // ── Data sub-categories contributions (max ~60 points total) ──
+  // Each data metric: RAW * weight_in_service * weight_in_data_category * 0.6 (data weight) * 100
+  // The sub-weights (0.30, 0.25, 0.15, etc.) are already baked into DATA_WEIGHTS
+  const httpContribution = http.score !== null
+    ? http.score * OVERALL_WEIGHTS.data * 100
+    : null;
 
-  const overallComponents = [
-    { score: voice.score, weight: OVERALL_WEIGHTS.voice },
-    { score: dataWeighted.score, weight: OVERALL_WEIGHTS.data },
-  ].filter((entry) => entry.score !== null);
+  const browsingContribution = browsing.score !== null
+    ? browsing.score * OVERALL_WEIGHTS.data * 100
+    : null;
 
-  const overallWeighted = weightedScore(overallComponents);
+  const streamingContribution = streaming.score !== null
+    ? streaming.score * OVERALL_WEIGHTS.data * 100
+    : null;
+
+  const socialContribution = social.score !== null
+    ? social.score * OVERALL_WEIGHTS.data * 100
+    : null;
+
+  const latencyContribution = latency.score !== null
+    ? latency.score * OVERALL_WEIGHTS.data * 100
+    : null;
+
+  // Data total = sum of all data sub-category contributions
+  const dataContributions = [
+    httpContribution,
+    browsingContribution,
+    streamingContribution,
+    socialContribution,
+    latencyContribution,
+  ].filter(c => c !== null);
+
+  const dataScore = dataContributions.length > 0
+    ? dataContributions.reduce((sum, c) => sum + c, 0)
+    : null;
+
+  // Overall = voice contribution + data contribution (additive, not averaged)
+  const allContributions = [voiceContribution, dataScore].filter(c => c !== null);
+  const overallScore = allContributions.length > 0
+    ? allContributions.reduce((sum, c) => sum + c, 0)
+    : null;
 
   console.log('[Scoring] Overall calculations:', {
-    voiceScore: voice.score,
+    voiceScore: voiceContribution,
     voiceWeight: OVERALL_WEIGHTS.voice,
-    dataScore: dataWeighted.score,
+    dataScore,
     dataWeight: OVERALL_WEIGHTS.data,
-    overallScore: overallWeighted.score,
-    overallAppliedWeight: overallWeighted.appliedWeight,
-    dataComponentsCount: dataComponents.length,
-    overallComponentsCount: overallComponents.length,
+    overallScore,
+    dataComponentsCount: dataContributions.length,
+    overallComponentsCount: allContributions.length,
   });
 
   return {
-    voice,
-    http,
-    browsing,
-    streaming,
-    social,
-    latency,
+    voice: { ...voice, score: voiceContribution },
+    http: { ...http, score: httpContribution },
+    browsing: { ...browsing, score: browsingContribution },
+    streaming: { ...streaming, score: streamingContribution },
+    social: { ...social, score: socialContribution },
+    latency: { ...latency, score: latencyContribution },
     data: {
-      score: dataWeighted.score,
-      appliedWeight: dataWeighted.appliedWeight,
+      score: dataScore,
+      appliedWeight: dataContributions.length,
     },
     overall: {
-      score: overallWeighted.score,
-      appliedWeight: overallWeighted.appliedWeight,
+      score: overallScore,
+      appliedWeight: allContributions.length,
     },
   };
 };

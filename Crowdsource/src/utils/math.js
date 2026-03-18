@@ -24,18 +24,14 @@ export const ratio = (numerator, denominator) => {
 
 export const scoreLinear = (value, good, bad, higherIsBetter = true) => {
   if (value === null || value === undefined) return null;
-  // QoE Calculator formula: RAW = MIN((result - bad) / (good - bad) * 100, 100)
-  // Allows negative scores when value is worse than 'bad' threshold
-  // Caps at 100 (1.0) when value meets or exceeds 'good' threshold
+  // QoE Calculator formula: RAW = (result - bad) / (good - bad) * 100
+  // No clamping — allows scores above 100% and below 0% per QoE Calculator
+  // Example: CST=0.493s, good=3s, bad=10s → RAW = (10-0.493)/(10-3)*100 = 135.81
 
   if (higherIsBetter) {
-    if (value >= good) return 1;
-    // No lower clamp — allows negative scores per QoE Calculator
     return (value - bad) / (good - bad);
   }
 
-  if (value <= good) return 1;
-  // No lower clamp — allows negative scores per QoE Calculator
   return (bad - value) / (bad - good);
 };
 

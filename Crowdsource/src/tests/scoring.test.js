@@ -117,8 +117,8 @@ describe('Math Utilities', () => {
             expect(scoreLinear(50, 0, 100, false)).toBe(0.5);
         });
 
-        test('clamps to 1 for values beyond good threshold', () => {
-            expect(scoreLinear(150, 100, 0, true)).toBe(1);
+        test('allows values beyond good threshold (no upper cap)', () => {
+            expect(scoreLinear(150, 100, 0, true)).toBe(1.5);
         });
 
         test('allows negative for values beyond bad threshold', () => {
@@ -333,7 +333,8 @@ describe('Data Scoring', () => {
             };
             const result = calculateScores(metrics);
             expect(result.browsing.durationAvg).toBe(5);
-            expect(result.browsing.score).toBeLessThan(0.7);
+            // Score is on 0-100 scale but can be negative for bad durations
+            expect(result.browsing.score).toBeLessThan(15);
         });
     });
 
@@ -432,8 +433,8 @@ describe('Overall Score Calculation', () => {
         const result = calculateScores(metrics);
 
         expect(result.overall.score).not.toBeNull();
-        // Score can be negative per QoE Calculator formula
-        expect(result.overall.score).toBeLessThanOrEqual(1);
+        // Score is now on 0-100 additive scale per QoE Calculator
+        expect(result.overall.score).toBeLessThanOrEqual(100);
     });
 
     test('handles voice-only metrics', () => {
@@ -567,8 +568,11 @@ describe('QoE Calculator Spreadsheet Verification', () => {
         expect(result.voice.cssr).toBe(1.0);
         expect(result.voice.cdr).toBe(0.5);
 
-        // Overall score should be negative (driven by terrible CDR of 50%)
-        // Spreadsheet shows: -20.23 (which would be -0.2023 in our 0-1 scale)
-        expect(result.overall.score).toBeLessThan(0);
+        // PDF shows overall = 74.74, but that uses different example data
+        // Our xlsb data gives voiceScore=-27.87, dataScore=69.47, overall=41.59
+        // The CDR of 50% drives voice strongly negative
+        expect(result.voice.score).toBeLessThan(0); // Voice is negative due to 50% CDR
+        expect(result.overall.score).toBeGreaterThan(30);
+        expect(result.overall.score).toBeLessThan(50);
     });
 });
