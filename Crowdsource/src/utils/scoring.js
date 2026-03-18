@@ -40,7 +40,8 @@ const calculateVoiceScore = (voiceMetrics) => {
   // This handles the case where all calls are dropped (completed = 0)
   const totalAnswered = completed + dropped;
   const cdr = ratio(dropped, totalAnswered);
-  const cstAvg = safeAverage(setupTimes);
+  // Call Setup Time average in seconds (setupTimes are stored in ms)
+  const cstAvg = safeAverage(setupTimes.map(t => t / 1000));
 
   console.log('[Scoring] Voice calculations:', {
     cssr,
@@ -116,12 +117,16 @@ const calculateHttpScore = (httpMetrics) => {
 
   const metrics = buildEntries([
     {
-      score: evaluateMetric(dlSuccess ?? ulSuccess, THRESHOLDS.http.successRatio),
-      weight: DATA_WEIGHTS.http.successRatio,
+      score: evaluateMetric(dlSuccess, THRESHOLDS.http.successRatio),
+      weight: DATA_WEIGHTS.http.successRatioDl,
     },
     { score: evaluateMetric(dlAvg, THRESHOLDS.http.dlAvg), weight: DATA_WEIGHTS.http.dlAvg },
     { score: evaluateMetric(dlP10, THRESHOLDS.http.dlP10), weight: DATA_WEIGHTS.http.dlP10 },
     { score: evaluateMetric(dlP90, THRESHOLDS.http.dlP90), weight: DATA_WEIGHTS.http.dlP90 },
+    {
+      score: evaluateMetric(ulSuccess, THRESHOLDS.http.successRatio),
+      weight: DATA_WEIGHTS.http.successRatioUl,
+    },
     { score: evaluateMetric(ulAvg, THRESHOLDS.http.ulAvg), weight: DATA_WEIGHTS.http.ulAvg },
     { score: evaluateMetric(ulP10, THRESHOLDS.http.ulP10), weight: DATA_WEIGHTS.http.ulP10 },
     { score: evaluateMetric(ulP90, THRESHOLDS.http.ulP90), weight: DATA_WEIGHTS.http.ulP90 },

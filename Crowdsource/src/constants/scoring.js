@@ -1,11 +1,11 @@
-// Voice weights per QoE Calculator table (25% + 25% + 15% + 10% + 15% + 10% = 100%)
+// Voice weights per QoE Calculator table (33.3% + 33.3% + 0% + 0% + 20% + 13.3% = 99.9%)
 export const VOICE_WEIGHTS = {
-  cssr: 0.25,        // Call Setup Success Ratio: 25% of voice
-  cdr: 0.25,         // Call Drop Ratio: 25% of voice
-  mosAvg: 0.15,      // MOS: 15% of voice
-  mosUnder16: 0.10,  // MOS < 1.6: 10% of voice
-  cstAvg: 0.15,      // Call Setup Time [s]: 15% of voice
-  cstOver15: 0.10,   // Call Setup Time > 10s: 10% of voice (using >15s threshold)
+  cssr: 0.333,       // Call Setup Success Ratio: 33.3% of voice
+  cdr: 0.333,        // Call Drop Ratio: 33.3% of voice
+  mosAvg: 0.0,       // MOS: 0% of voice (not scored per QoE Calculator)
+  mosUnder16: 0.0,   // MOS < 1.6: 0% of voice (not scored per QoE Calculator)
+  cstAvg: 0.2,       // Call Setup Time [s]: 20% of voice
+  cstOver15: 0.133,  // Call Setup Time > 10s: 13.3% of voice
   cstP10: 0.0,       // Not in calculator table
   mosP90: 0.0,       // Not in calculator table
 };
@@ -13,13 +13,14 @@ export const VOICE_WEIGHTS = {
 export const DATA_WEIGHTS = {
   // Data Testing (HTTP/FTP) - 30% of data component
   http: {
-    successRatio: 0.03,      // 10% of 30% = 3% of data
-    dlAvg: 0.042,            // 14% of 30% = 4.2% of data
-    dlP10: 0.054,            // 18% of 30% = 5.4% of data
-    dlP90: 0.024,            // 8% of 30% = 2.4% of data
-    ulAvg: 0.042,            // 14% of 30% = 4.2% of data
-    ulP10: 0.054,            // 18% of 30% = 5.4% of data
-    ulP90: 0.024,            // 8% of 30% = 2.4% of data
+    successRatioDl: 0.03,    // Transfer Success Ratio DL: 10% of 30% = 3% of data
+    dlAvg: 0.042,            // Average throughput DL: 14% of 30% = 4.2% of data
+    dlP10: 0.054,            // 10th percentile DL: 18% of 30% = 5.4% of data
+    dlP90: 0.024,            // 90th percentile DL: 8% of 30% = 2.4% of data
+    successRatioUl: 0.03,    // Transfer Success Ratio UL: 10% of 30% = 3% of data
+    ulAvg: 0.042,            // Average throughput UL: 14% of 30% = 4.2% of data
+    ulP10: 0.054,            // 10th percentile UL: 18% of 30% = 5.4% of data
+    ulP90: 0.024,            // 90th percentile UL: 8% of 30% = 2.4% of data
   }, // sums to 0.30 (30% of data)
   // Browsing - 25% of data component
   browsing: {
@@ -54,23 +55,23 @@ export const OVERALL_WEIGHTS = {
 
 export const THRESHOLDS = {
   voice: {
-    cssr: { good: 1.0, bad: 0.85, higherIsBetter: true },
-    cdr: { good: 0.0, bad: 0.1, higherIsBetter: false },
-    cstAvg: { good: 4.5, bad: 12, higherIsBetter: false },
-    cstOver15: { good: 0.0, bad: 0.03, higherIsBetter: false },
-    cstP10: { good: 4.0, bad: 8.0, higherIsBetter: false },
-    mosAvg: { good: 4.3, bad: 2.0, higherIsBetter: true },
-    mosUnder16: { good: 0.0, bad: 0.10, higherIsBetter: false },
-    mosP90: { good: 4.75, bad: 4.0, higherIsBetter: true },
+    cssr: { good: 1.0, bad: 0.9, higherIsBetter: true },          // 90% bad, 100% good
+    cdr: { good: 0.0, bad: 0.1, higherIsBetter: false },          // 10% bad, 0% good
+    cstAvg: { good: 3.0, bad: 10.0, higherIsBetter: false },      // 10s bad, 3s good
+    cstOver15: { good: 0.0, bad: 0.03, higherIsBetter: false },   // 3% bad, 0% good
+    cstP10: { good: 4.0, bad: 8.0, higherIsBetter: false },       // Not in calculator
+    mosAvg: { good: 5.0, bad: 2.5, higherIsBetter: true },        // 2.5 bad, 5.0 good
+    mosUnder16: { good: 0.0, bad: 0.10, higherIsBetter: false },  // 10% bad, 0% good
+    mosP90: { good: 4.75, bad: 4.0, higherIsBetter: true },       // Not in calculator
   },
   http: {
-    successRatio: { good: 1.0, bad: 0.8, higherIsBetter: true },
-    dlAvg: { good: 100, bad: 1, higherIsBetter: true },
-    dlP10: { good: 40, bad: 1, higherIsBetter: true },
-    dlP90: { good: 240, bad: 10, higherIsBetter: true },
-    ulAvg: { good: 50, bad: 0.5, higherIsBetter: true },
-    ulP10: { good: 30, bad: 0.5, higherIsBetter: true },
-    ulP90: { good: 100, bad: 5, higherIsBetter: true },
+    successRatio: { good: 1.0, bad: 0.8, higherIsBetter: true },  // 80% bad, 100% good
+    dlAvg: { good: 1000, bad: 1, higherIsBetter: true },           // 1 Mbps bad, 1000 Mbps good
+    dlP10: { good: 1000, bad: 1, higherIsBetter: true },           // 1 Mbps bad, 1000 Mbps good
+    dlP90: { good: 1000, bad: 1, higherIsBetter: true },           // 1 Mbps bad, 1000 Mbps good
+    ulAvg: { good: 1000, bad: 1, higherIsBetter: true },           // 1 Mbps bad, 1000 Mbps good
+    ulP10: { good: 1000, bad: 1, higherIsBetter: true },           // 1 Mbps bad, 1000 Mbps good
+    ulP90: { good: 1000, bad: 1, higherIsBetter: true },           // 1 Mbps bad, 1000 Mbps good
   },
   browsing: {
     successRatio: { good: 1.0, bad: 0.8, higherIsBetter: true }, // Activity Success Ratio: 80% bad, 100% good

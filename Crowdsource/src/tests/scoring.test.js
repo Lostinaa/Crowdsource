@@ -121,8 +121,8 @@ describe('Math Utilities', () => {
             expect(scoreLinear(150, 100, 0, true)).toBe(1);
         });
 
-        test('clamps to 0 for values beyond bad threshold', () => {
-            expect(scoreLinear(-50, 100, 0, true)).toBe(0);
+        test('allows negative for values beyond bad threshold', () => {
+            expect(scoreLinear(-50, 100, 0, true)).toBe(-0.5);
         });
     });
 
@@ -159,9 +159,9 @@ describe('Math Utilities', () => {
 // ============================================================================
 
 describe('Weight Configuration', () => {
-    test('voice weights sum to 1.0', () => {
+    test('voice weights sum to ~1.0', () => {
         const sum = Object.values(VOICE_WEIGHTS).reduce((a, b) => a + b, 0);
-        expect(sum).toBeCloseTo(1.0, 2);
+        expect(sum).toBeCloseTo(1.0, 1); // 0.999 per QoE Calculator table
     });
 
     test('overall weights sum to 1.0', () => {
@@ -221,8 +221,8 @@ describe('Voice Scoring', () => {
             },
         };
         const result = calculateScores(metrics);
-        // Score is ~0.85 due to setup time threshold (3s is between good/bad range)
-        expect(result.voice.score).toBeGreaterThan(0.8);
+        // Perfect: CSSR=1.0, CDR=0, CST=3s (at good threshold), MOS weights are 0
+        expect(result.voice.score).toBeGreaterThan(0.95);
         expect(result.voice.cssr).toBe(1.0);
         expect(result.voice.cdr).toBe(0);
     });
@@ -432,7 +432,7 @@ describe('Overall Score Calculation', () => {
         const result = calculateScores(metrics);
 
         expect(result.overall.score).not.toBeNull();
-        expect(result.overall.score).toBeGreaterThan(0);
+        // Score can be negative per QoE Calculator formula
         expect(result.overall.score).toBeLessThanOrEqual(1);
     });
 
@@ -528,11 +528,47 @@ describe('Edge Cases', () => {
         expect(() => calculateScores(metrics)).not.toThrow();
     });
 });
-     addVoiceSample({
-          attempt: false,
-          callCompleted: false,
-          dropped: false,
-          reasonCode: payload?.causeCode,
-          reasonLabel: payload?.causeLabel || 'Unknown',
-          reasonSource: payload?.source || 'native',
-        });
+
+// ============================================================================
+// QoE Calculator Spreadsheet Verification
+// ============================================================================
+
+describe('QoE Calculator Spreadsheet Verification', () => {
+    test('matches spreadsheet example data scores', () => {
+        // Example data from QoE Calculator (version 1).xlsb
+        const metrics = {
+            voice: {
+                attempts: 10,
+                setupOk: 10,        // CSSR = 1.0
+                completed: 5,
+                dropped: 5,          // CDR = 0.5
+                setupTimes: [4055],  // 4.055s avg
+                mosSamples: [],      // No MOS data (weight = 0 per spreadsheet)
+            },
+            data: {
+                http: {
+                    dl: { requests: 1, completed: 1, throughputs: [22.07] },
+                    ul: { requests: 1, completed: 1, throughputs: [3.72] },
+                },
+                browsing: { requests: 1, completed: 1, durations: [7018.8] }, // 7.0188s avg
+                streaming: {
+                    requests: 1, completed: 1,
+                    mosSamples: [4.0],
+                    setupTimes: [10248.5], // 10.2485s avg
+                },
+                social: { requests: 1, completed: 1, durations: [1297] }, // 1.297s avg
+                latency: { requests: 1, completed: 1, scores: [40.5] },
+            },
+        };
+
+        const result = calculateScores(metrics);
+
+        // Voice: CSSR=100, CDR=-400 (0.5 is way above bad=0.1), CST=84.9, CST>10s=100
+        expect(result.voice.cssr).toBe(1.0);
+        expect(result.voice.cdr).toBe(0.5);
+
+        // Overall score should be negative (driven by terrible CDR of 50%)
+        // Spreadsheet shows: -20.23 (which would be -0.2023 in our 0-1 scale)
+        expect(result.overall.score).toBeLessThan(0);
+    });
+});

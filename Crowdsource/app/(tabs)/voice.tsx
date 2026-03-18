@@ -340,12 +340,21 @@ export default function VoiceScreen() {
   }, [addVoiceSample]);
 
 
-  // CallDisconnectModule listener is registered only when user presses Start
-  // (see handleStart / handleStop below — subscription managed there)
-
-
   const handleStart = async () => {
     try {
+      // ── Step 1: Request Default Phone Handler role FIRST ──
+      // Google Play policy requires the default handler prompt to appear
+
+      if (Platform.OS === 'android' && CallDropBridgeModule) {
+        try {
+          await CallDropBridgeModule.requestCallRole();
+          console.log('[Voice] Default handler prompt shown (before permissions)');
+        } catch (e) {
+          console.warn('[Voice] requestCallRole failed:', e);
+        }
+      }
+
+      // ── Step 2: Request runtime permissions ──
       let granted = CallMetrics.isPermissionGranted();
 
       if (!granted && Platform.OS === 'android') {
@@ -405,11 +414,10 @@ export default function VoiceScreen() {
         await CallMetrics.start();
         isListeningRef.current = true;
 
-        // ── 1. Register InCallService listener (real DisconnectCause) ──
+        // ── 3. Register InCallService listener (real DisconnectCause) ──
         if (CallDropBridgeModule) {
           try {
-            // Request telecom role (non-blocking — shows system dialog)
-            await CallDropBridgeModule.requestCallRole();
+            // Role was already requested in Step 1 above
 
             inCallServiceSubRef.current = CallDropBridgeModule.addListener('CallDropCauseEvent', (payload: any) => {
               console.log('[Voice] InCallService DisconnectCause:', payload);
@@ -516,7 +524,7 @@ export default function VoiceScreen() {
         }
 
         setIsListening(true);
-        Alert.alert('Success', 'Capturing metrics started. Make or receive a call to see events.');
+        console.log('[Voice] Call metrics monitoring started successfully');
       } else {
         Alert.alert(
           'Permission required',
@@ -575,6 +583,19 @@ export default function VoiceScreen() {
     }
   };
 
+  // ── Auto-start: always start monitoring on mount ──
+  // First time: prompts for default handler + permissions, then starts capturing
+  // Subsequent launches: permissions already granted, starts silently
+  // NOTE: Must be placed AFTER handleStart definition (const functions are not hoisted)
+  const autoStartAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (autoStartAttemptedRef.current) return;
+    autoStartAttemptedRef.current = true;
+
+    console.log('[Voice] Auto-starting call metrics monitoring...');
+    handleStart();
+  }, []);
+
   const [showDialpad, setShowDialpad] = useState(false);
   const [metricsExpanded, setMetricsExpanded] = useState(false);
 
@@ -592,24 +613,14 @@ export default function VoiceScreen() {
           <View style={styles.captureBannerLeft}>
             <View style={[styles.statusDot, isListening && styles.statusDotActive]} />
             <Text style={styles.captureBannerText}>
-              {isListening ? 'Capturing call metrics' : 'Call metrics paused'}
+              {isListening ? 'Capturing call metrics' : 'Starting call metrics...'}
             </Text>
           </View>
-          {!isListening ? (
-            <TouchableOpacity
-              style={styles.captureStartBtn}
-              onPress={handleStart}
-            >
-              <Text style={styles.captureStartBtnText}>Start</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={styles.captureStopBtn}
-              onPress={handleStop}
-            >
-              <Text style={styles.captureStopBtnText}>Stop</Text>
-            </TouchableOpacity>
-          )}
+          <Ionicons
+            name={metricsExpanded ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={theme.textSecondary}
+          />
         </View>
 
         {/* Expandable metrics */}
