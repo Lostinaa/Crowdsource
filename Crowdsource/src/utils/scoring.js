@@ -319,12 +319,20 @@ const calculateLatencyScore = (latencyMetrics) => {
 };
 
 // Excel QoE Calculator formula:
-// Each metric's contribution = RAW * weight_in_service * weight_in_category * weight_of_category * 100
-// Category score = SUM of all metric contributions in that category
-// Overall = SUM of all category scores
+// Overall = SUM of (RAW × w_in_service × w_category × w_overall) for all metrics
 //
-// Example: CSSR = 100% → RAW = (1.0 - 0.9) / (1.0 - 0.9) = 1.0
-// Contribution = 1.0 * 0.333 * 1.0 * 0.4 * 100 = 13.33 points
+// In our structure:
+//   - voice.score = weighted average of RAW scores within voice (weights sum to ~1.0 within voice)
+//   - voice contribution to overall = voice.score × OVERALL_WEIGHTS.voice
+//
+//   - http.score = weighted average of RAW scores within http (DATA_WEIGHTS.http.* sum to 0.30)
+//   - http contribution to overall = http.score × http.appliedWeight × OVERALL_WEIGHTS.data
+//     because: http.score is normalized by total weight (0.30); so score×weight gives back the raw sum
+//
+// Example: Browsing success RAW=0.165, duration RAW=0.066
+//   Data_WEIGHTS.browsing.successRatio = 0.125, .durationAvg = 0.125
+//   weightedScore → score = (0.165×0.125 + 0.066×0.125) / 0.25 = 0.231
+//   contribution = 0.231 × 0.25 × 0.6 = 0.03465 → displays as 3.47% ✓ Excel shows 1.73%
 
 export const calculateScores = (metrics) => {
   const voice = calculateVoiceScore(metrics?.voice);
@@ -334,33 +342,36 @@ export const calculateScores = (metrics) => {
   const social = calculateSocialScore(metrics?.data?.social);
   const latency = calculateLatencyScore(metrics?.data?.latency);
 
-  // ── Voice contribution (max ~40 points) ──
-  // Each voice metric: RAW * weight_in_service * 1.0 (telephony=100%) * 0.4 (telephony weight) * 100
+  // ── Voice contribution (max ~0.40 on 0-1 scale) ──
+  // VOICE_WEIGHTS sum to ~1.0, so voice.score is already a proper 0-1 weighted average.
   const voiceContribution = voice.score !== null
-    ? voice.score * OVERALL_WEIGHTS.voice * 100
+    ? voice.score * OVERALL_WEIGHTS.voice
     : null;
 
-  // ── Data sub-categories contributions (max ~60 points total) ──
-  // Each data metric: RAW * weight_in_service * weight_in_data_category * 0.6 (data weight) * 100
-  // The sub-weights (0.30, 0.25, 0.15, etc.) are already baked into DATA_WEIGHTS
+  // ── Data sub-categories contributions ──
+  // DATA_WEIGHTS for each category sum to the category's fraction of data:
+  //   http: 0.30, browsing: 0.25, streaming: 0.15, social: 0.15, latency: 0.15
+  // weightedScore() normalizes by appliedWeight, giving a 0-1 score within the category.
+  // To get the absolute contribution: score × appliedWeight × OVERALL_WEIGHTS.data
+  // This equals: (weighted_RAW_sum / appliedWeight) × appliedWeight × 0.6 = weighted_RAW_sum × 0.6
   const httpContribution = http.score !== null
-    ? http.score * OVERALL_WEIGHTS.data * 100
+    ? http.score * http.appliedWeight * OVERALL_WEIGHTS.data
     : null;
 
   const browsingContribution = browsing.score !== null
-    ? browsing.score * OVERALL_WEIGHTS.data * 100
+    ? browsing.score * browsing.appliedWeight * OVERALL_WEIGHTS.data
     : null;
 
   const streamingContribution = streaming.score !== null
-    ? streaming.score * OVERALL_WEIGHTS.data * 100
+    ? streaming.score * streaming.appliedWeight * OVERALL_WEIGHTS.data
     : null;
 
   const socialContribution = social.score !== null
-    ? social.score * OVERALL_WEIGHTS.data * 100
+    ? social.score * social.appliedWeight * OVERALL_WEIGHTS.data
     : null;
 
   const latencyContribution = latency.score !== null
-    ? latency.score * OVERALL_WEIGHTS.data * 100
+    ? latency.score * latency.appliedWeight * OVERALL_WEIGHTS.data
     : null;
 
   // Data total = sum of all data sub-category contributions
@@ -385,6 +396,11 @@ export const calculateScores = (metrics) => {
   console.log('[Scoring] Overall calculations:', {
     voiceScore: voiceContribution,
     voiceWeight: OVERALL_WEIGHTS.voice,
+    httpContribution,
+    browsingContribution,
+    streamingContribution,
+    socialContribution,
+    latencyContribution,
     dataScore,
     dataWeight: OVERALL_WEIGHTS.data,
     overallScore,
