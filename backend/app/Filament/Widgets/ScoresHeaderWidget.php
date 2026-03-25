@@ -47,9 +47,12 @@ class ScoresHeaderWidget extends BaseWidget
         $dataScore = $this->avgScore($metrics, 'data');
         $prevDataScore = $this->avgScore($prevMetrics, 'data');
 
-        // Total Score = 40% Voice + 60% Data (standard weighting)
-        $totalScore = ($voiceScore * self::VOICE_WEIGHT) + ($dataScore * self::DATA_WEIGHT);
-        $prevTotalScore = ($prevVoiceScore * self::VOICE_WEIGHT) + ($prevDataScore * self::DATA_WEIGHT);
+        // Total Score = voice contribution + data contribution
+        // NOTE: The app pre-weights scores before sending (voice already ×40%, data already ×60%)
+        // So total is the SUM of contributions, not a weighted average.
+        // This matches the QoE Calculator additive formula: Total = SUM of all metric contributions.
+        $totalScore = $voiceScore + $dataScore;
+        $prevTotalScore = $prevVoiceScore + $prevDataScore;
 
         return [
             $this->buildStat(
