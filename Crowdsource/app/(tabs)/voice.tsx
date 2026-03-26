@@ -289,7 +289,7 @@ export default function VoiceScreen() {
               } else if (causeLabel === 'LOCAL' || causeLabel === 'REMOTE') {
                 completed = true;
                 rule = `InCallService(stored): ${causeLabel} — normal hangup`;
-              } else if (causeLabel === 'MISSED' || causeLabel === 'REJECTED' || causeLabel === 'CANCELED' || causeLabel === 'BUSY') {
+              } else if (causeLabel === 'MISSED' || causeLabel === 'REJECTED' || causeLabel === 'CANCELED' || causeLabel === 'BUSY' || causeLabel === 'NOT_CONNECTED') {
                 rule = `InCallService(stored): ${causeLabel} — not connected, ignored`;
               } else {
                 completed = true;
@@ -443,8 +443,8 @@ export default function VoiceScreen() {
                 } else if (causeLabel === 'LOCAL' || causeLabel === 'REMOTE') {
                   completed = true;
                   rule = `InCallService: ${causeLabel} — normal hangup`;
-                } else if (causeLabel === 'MISSED' || causeLabel === 'REJECTED' || causeLabel === 'CANCELED' || causeLabel === 'BUSY') {
-                  rule = `InCallService: ${causeLabel} — not a connected call, ignored`;
+                } else if (causeLabel === 'MISSED' || causeLabel === 'REJECTED' || causeLabel === 'CANCELED' || causeLabel === 'BUSY' || causeLabel === 'NOT_CONNECTED') {
+``                  rule = `InCallService: ${causeLabel} — not a connected call, ignored`;
                 } else {
                   completed = true;
                   rule = `InCallService: ${causeLabel} — defaulting to completed`;

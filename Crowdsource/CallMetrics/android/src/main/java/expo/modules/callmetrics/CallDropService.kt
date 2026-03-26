@@ -65,6 +65,7 @@ class CallDropService : InCallService() {
         Log.d(TAG, "Call added — attaching callback, launching UI")
 
         val callStart = System.currentTimeMillis()
+        var everActive = false   // did this call ever reach ACTIVE state?
 
         // Launch the in-call activity
         launchInCallActivity(call)
@@ -83,6 +84,11 @@ class CallDropService : InCallService() {
                 }
                 Log.d(TAG, "Call state changed: $stateName")
 
+                // Track if call was ever answered / went active
+                if (state == Call.STATE_ACTIVE) {
+                    everActive = true
+                }
+
                 if (state == Call.STATE_DISCONNECTED) {
                     val details = call.details
                     val disconnectCause = details?.disconnectCause
@@ -90,10 +96,18 @@ class CallDropService : InCallService() {
 
                     if (disconnectCause != null) {
                         val code = disconnectCause.code
-                        val label = codeToLabel(code)
+                        var label = codeToLabel(code)
                         val description = disconnectCause.description?.toString() ?: ""
 
-                        Log.d(TAG, "Call disconnected — cause: $label ($code), description: $description, duration: ${callDuration}ms")
+                        // If call ended with LOCAL but never went ACTIVE, the remote party
+                        // was busy and the device auto-dropped it — report as NOT_CONNECTED
+                        // so the React side correctly ignores it (not counted as completed call)
+                        if (label == "LOCAL" && !everActive) {
+                            Log.d(TAG, "LOCAL disconnect but call never went ACTIVE — treating as NOT_CONNECTED (busy/failed)")
+                            label = "NOT_CONNECTED"
+                        }
+
+                        Log.d(TAG, "Call disconnected — cause: $label ($code), everActive: $everActive, description: $description, duration: ${callDuration}ms")
 
                         onCallDisconnected?.invoke(code, label, description, callDuration)
                     } else {
