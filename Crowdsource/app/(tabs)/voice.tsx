@@ -224,15 +224,12 @@ export default function VoiceScreen() {
             console.log('[Voice] Incoming call answered — excluded from QoE metrics');
             callSetupStartTimeRef.current = null;
           } else {
-            // OUTGOING call — this IS counted in QoE
-            // Compute setup time from when user pressed call in dialer to now (OFFHOOK)
-            const initiatedAt = getCallInitiatedAt();
-            const setupTimeMs = initiatedAt ? (now - initiatedAt) : 0;
+            // OUTGOING call — record attempt now; setupTimeMs comes later from InCallService
+            // (InCallService measures DIALING→ACTIVE = true network CST, not Android intent delay)
             clearCallInitiatedAt();
-
             callSetupStartTimeRef.current = now;
-            addVoiceSample({ attempt: true, setupSuccessful: true, setupTimeMs });
-            console.log(`[Voice] Outgoing call detected — setupTime: ${setupTimeMs}ms — counted in QoE`);
+            addVoiceSample({ attempt: true, setupSuccessful: true });
+            console.log('[Voice] Outgoing call offhook — attempt recorded, awaiting native CST from InCallService');
           }
           callStartTimeRef.current = now;
           isActiveCallRef.current = true;
@@ -298,7 +295,10 @@ export default function VoiceScreen() {
 
               console.log(`[Voice] Call classified via stored InCallService: ${dropped ? 'DROPPED' : completed ? 'COMPLETED' : 'IGNORED'} | Rule: ${rule}`);
               if (dropped || completed) {
-                addVoiceSample({ callCompleted: completed, dropped });
+                // Use native setupTimeMs (DIALING→ACTIVE) from InCallService — true network CST
+                const nativeSetupMs = storedCause.setupTimeMs ?? 0;
+                console.log(`[Voice] Native CST from InCallService: ${nativeSetupMs}ms`);
+                addVoiceSample({ callCompleted: completed, dropped, setupTimeMs: nativeSetupMs > 0 ? nativeSetupMs : undefined });
               }
               addVoiceSample({
                 reasonCode: storedCause.causeCode,
@@ -453,7 +453,10 @@ export default function VoiceScreen() {
                 console.log(`[Voice] Call classified via InCallService: ${dropped ? 'DROPPED' : completed ? 'COMPLETED' : 'IGNORED'} | Rule: ${rule}`);
 
                 if (dropped || completed) {
-                  addVoiceSample({ callCompleted: completed, dropped });
+                  // Use native setupTimeMs (DIALING→ACTIVE) from InCallService — true network CST
+                  const nativeSetupMs = payload?.setupTimeMs ?? 0;
+                  console.log(`[Voice] Native CST from InCallService: ${nativeSetupMs}ms`);
+                  addVoiceSample({ callCompleted: completed, dropped, setupTimeMs: nativeSetupMs > 0 ? nativeSetupMs : undefined });
                 }
                 addVoiceSample({
                   reasonCode: payload?.causeCode,
@@ -469,6 +472,7 @@ export default function VoiceScreen() {
                   causeLabel: payload?.causeLabel,
                   causeDescription: payload?.causeDescription,
                   callDurationMs: payload?.callDurationMs,
+                  setupTimeMs: payload?.setupTimeMs,    // native DIALING→ACTIVE CST
                 };
               }
             });

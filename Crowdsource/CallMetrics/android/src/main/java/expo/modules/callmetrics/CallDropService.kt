@@ -36,7 +36,8 @@ class CallDropService : InCallService() {
             causeCode: Int,
             causeLabel: String,
             causeDescription: String,
-            callDurationMs: Long
+            callDurationMs: Long,
+            setupTimeMs: Long
         ) -> Unit)? = null
 
         /** Current active call — used by InCallActivity for call control */
@@ -66,6 +67,8 @@ class CallDropService : InCallService() {
 
         val callStart = System.currentTimeMillis()
         var everActive = false   // did this call ever reach ACTIVE state?
+        var dialingTimeMs = 0L   // when radio dialing started (T0 for true CST)
+        var activeTimeMs  = 0L   // when call was answered (T1 for true CST)
 
         // Launch the in-call activity
         launchInCallActivity(call)
@@ -73,26 +76,40 @@ class CallDropService : InCallService() {
         call.registerCallback(object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
                 val stateName = when (state) {
-                    Call.STATE_RINGING -> "RINGING"
-                    Call.STATE_DIALING -> "DIALING"
-                    Call.STATE_ACTIVE -> "ACTIVE"
-                    Call.STATE_HOLDING -> "HOLDING"
+                    Call.STATE_RINGING      -> "RINGING"
+                    Call.STATE_DIALING      -> "DIALING"
+                    Call.STATE_ACTIVE       -> "ACTIVE"
+                    Call.STATE_HOLDING      -> "HOLDING"
                     Call.STATE_DISCONNECTED -> "DISCONNECTED"
-                    Call.STATE_CONNECTING -> "CONNECTING"
-                    Call.STATE_DISCONNECTING -> "DISCONNECTING"
+                    Call.STATE_CONNECTING   -> "CONNECTING"
+                    Call.STATE_DISCONNECTING-> "DISCONNECTING"
                     else -> "UNKNOWN($state)"
                 }
                 Log.d(TAG, "Call state changed: $stateName")
 
-                // Track if call was ever answered / went active
-                if (state == Call.STATE_ACTIVE) {
-                    everActive = true
+                when (state) {
+                    // T0: call submitted to radio/network — true start of CST
+                    Call.STATE_DIALING -> {
+                        dialingTimeMs = System.currentTimeMillis()
+                    }
+                    // T1: call answered/connected — end of CST
+                    Call.STATE_ACTIVE -> {
+                        everActive = true
+                        if (activeTimeMs == 0L) {
+                            activeTimeMs = System.currentTimeMillis()
+                        }
+                    }
                 }
 
                 if (state == Call.STATE_DISCONNECTED) {
                     val details = call.details
                     val disconnectCause = details?.disconnectCause
                     val callDuration = System.currentTimeMillis() - callStart
+
+                    // True network CST: DIALING → ACTIVE (excludes Android intent overhead)
+                    // Falls back to 0 if call never connected (busy, rejected, etc.)
+                    val setupTimeMs = if (dialingTimeMs > 0L && activeTimeMs > 0L)
+                        activeTimeMs - dialingTimeMs else 0L
 
                     if (disconnectCause != null) {
                         val code = disconnectCause.code
@@ -107,12 +124,12 @@ class CallDropService : InCallService() {
                             label = "NOT_CONNECTED"
                         }
 
-                        Log.d(TAG, "Call disconnected — cause: $label ($code), everActive: $everActive, description: $description, duration: ${callDuration}ms")
+                        Log.d(TAG, "Call disconnected — cause: $label ($code), everActive: $everActive, setupTimeMs: ${setupTimeMs}ms, description: $description, duration: ${callDuration}ms")
 
-                        onCallDisconnected?.invoke(code, label, description, callDuration)
+                        onCallDisconnected?.invoke(code, label, description, callDuration, setupTimeMs)
                     } else {
                         Log.w(TAG, "Call disconnected but no DisconnectCause available")
-                        onCallDisconnected?.invoke(-1, "UNKNOWN", "No cause available", callDuration)
+                        onCallDisconnected?.invoke(-1, "UNKNOWN", "No cause available", callDuration, 0L)
                     }
 
                     call.unregisterCallback(this)

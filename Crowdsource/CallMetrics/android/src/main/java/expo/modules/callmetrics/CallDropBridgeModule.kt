@@ -13,7 +13,7 @@ import expo.modules.kotlin.modules.ModuleDefinition
  * Expo bridge module that connects CallDropService (InCallService) to JavaScript.
  * 
  * Events emitted:
- *   - CallDropCauseEvent: { causeCode, causeLabel, causeDescription, callDurationMs }
+ *   - CallDropCauseEvent: { causeCode, causeLabel, causeDescription, callDurationMs, setupTimeMs }
  * 
  * Functions:
  *   - requestCallRole(): Prompts user to grant the app telecom call handling role
@@ -32,14 +32,15 @@ class CallDropBridgeModule : Module() {
 
         OnCreate {
             // Register the static callback so CallDropService can emit events to JS
-            CallDropService.onCallDisconnected = { causeCode, causeLabel, causeDescription, callDurationMs ->
-                Log.d(TAG, "Forwarding disconnect event to JS: $causeLabel ($causeCode)")
+            CallDropService.onCallDisconnected = { causeCode, causeLabel, causeDescription, callDurationMs, setupTimeMs ->
+                Log.d(TAG, "Forwarding disconnect event to JS: $causeLabel ($causeCode), setupTimeMs: ${setupTimeMs}ms")
                 try {
                     sendEvent("CallDropCauseEvent", mapOf(
                         "causeCode" to causeCode,
                         "causeLabel" to causeLabel,
                         "causeDescription" to causeDescription,
                         "callDurationMs" to callDurationMs,
+                        "setupTimeMs" to setupTimeMs,
                         "source" to "incallservice"
                     ))
                 } catch (e: Exception) {
