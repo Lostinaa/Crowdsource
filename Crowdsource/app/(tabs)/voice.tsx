@@ -444,7 +444,7 @@ export default function VoiceScreen() {
                   completed = true;
                   rule = `InCallService: ${causeLabel} — normal hangup`;
                 } else if (causeLabel === 'MISSED' || causeLabel === 'REJECTED' || causeLabel === 'CANCELED' || causeLabel === 'BUSY' || causeLabel === 'NOT_CONNECTED') {
-``                  rule = `InCallService: ${causeLabel} — not a connected call, ignored`;
+                  rule = `InCallService: ${causeLabel} — not a connected call, ignored`;
                 } else {
                   completed = true;
                   rule = `InCallService: ${causeLabel} — defaulting to completed`;
