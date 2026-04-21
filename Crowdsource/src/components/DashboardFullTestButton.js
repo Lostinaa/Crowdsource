@@ -25,6 +25,33 @@ export default function DashboardFullTestButton({
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const rotateAnim = useRef(new Animated.Value(0)).current;
 
+    // Generate tick marks for the watch dial effect
+    const renderTickMarks = () => {
+        const ticks = [];
+        const totalTicks = 40;
+        for (let i = 0; i < totalTicks; i++) {
+            const rotation = (i * (360 / totalTicks)) + 'deg';
+            // Make every 5th tick slightly larger
+            const isMajorLabel = i % 5 === 0;
+            ticks.push(
+                <View
+                    key={i}
+                    style={[
+                        styles.tickMarkWrapper,
+                        { transform: [{ rotate: rotation }] }
+                    ]}
+                >
+                    <View style={[
+                        styles.tickMark,
+                        isMajorLabel ? styles.tickMarkMajor : styles.tickMarkMinor,
+                        (isTesting && i < (progress * totalTicks)) ? styles.tickMarkActive : null
+                    ]} />
+                </View>
+            );
+        }
+        return ticks;
+    };
+
     useEffect(() => {
         let pulse;
         let rotation;
@@ -110,6 +137,11 @@ export default function DashboardFullTestButton({
                 />
             )}
 
+            {/* Watch Dial Background */}
+            <View style={styles.dialContainer}>
+                {renderTickMarks()}
+            </View>
+
             {/* Main Circular Button */}
             <Animated.View style={{ transform: [{ scale: isTesting ? 1 : pulseAnim }] }}>
                 <TouchableOpacity
@@ -124,9 +156,7 @@ export default function DashboardFullTestButton({
                         {isTesting ? (
                             <View style={styles.contentContainer}>
                                 <Text style={styles.progressText}>{Math.round(progress * 100)}%</Text>
-                                <Text style={styles.statusLabel}>{testLabel}</Text>
-
-                                {/* Rotating Border */}
+                                {/* Rotating Border Segment */}
                                 <Animated.View
                                     style={[
                                         styles.spinnerBorder,
@@ -144,38 +174,20 @@ export default function DashboardFullTestButton({
                 </TouchableOpacity>
             </Animated.View>
 
-            {/* Checklist UI when testing or completed */}
+            {/* Transitioning Centered Text below the button instead of checklist */}
             {(isTesting || isComplete) && (
-                <View style={styles.checklistContainer}>
-                    {steps.map((step, index) => {
-                        let status = 'pending';
-                        if (isComplete || (currentStepIndex !== -1 && index < currentStepIndex)) {
-                            status = 'done';
-                        } else if (currentStepIndex === index) {
-                            status = 'running';
-                        } else if (hasStarted === false) {
-                            status = 'pending';
-                        }
-
-                        return (
-                            <View key={step.key} style={styles.checklistItem}>
-                                <View style={styles.iconContainer}>
-                                    {status === 'done' && <MaterialCommunityIcons name="check-circle" size={20} color={theme.colors.success} />}
-                                    {status === 'running' && <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                                        <MaterialCommunityIcons name="loading" size={20} color={theme.colors.primary} />
-                                    </Animated.View>}
-                                    {status === 'pending' && <MaterialCommunityIcons name="circle-outline" size={20} color={theme.colors.border.light} />}
-                                </View>
-                                <Text style={[
-                                    styles.checklistText,
-                                    status === 'done' && styles.checklistTextDone,
-                                    status === 'running' && styles.checklistTextRunning
-                                ]}>
-                                    {step.title}
-                                </Text>
-                            </View>
-                        );
-                    })}
+                <View style={styles.statusTextContainer}>
+                    <Text style={styles.statusLabelBig}>{testLabel}</Text>
+                    {isTesting && (
+                        <Animated.View style={{ transform: [{ rotate: spin }], marginTop: 8 }}>
+                             <MaterialCommunityIcons name="loading" size={24} color={theme.colors.primary} />
+                        </Animated.View>
+                    )}
+                    {isComplete && (
+                        <View style={{ marginTop: 8 }}>
+                             <MaterialCommunityIcons name="check-circle" size={24} color={theme.colors.success} />
+                        </View>
+                    )}
                 </View>
             )}
         </View>
@@ -230,53 +242,61 @@ const styles = StyleSheet.create({
         fontSize: 32,
         fontWeight: '800',
     },
-    statusLabel: {
-        color: 'rgba(255,255,255,0.9)',
-        fontSize: 10,
+    statusLabelBig: {
+        color: theme.colors.text.primary,
+        fontSize: 16,
         fontWeight: '600',
-        marginTop: 2,
+        letterSpacing: 0.5,
     },
     spinnerBorder: {
         position: 'absolute',
         width: 170,
         height: 170,
         borderRadius: 85,
-        borderWidth: 5,
+        borderWidth: 4,
         borderColor: 'transparent',
-        borderTopColor: 'white',
-        borderRightColor: 'rgba(255,255,255,0.3)',
+        borderTopColor: 'rgba(255,255,255,0.8)',
+        borderRightColor: 'rgba(255,255,255,0.4)',
     },
-    checklistContainer: {
-        marginTop: theme.spacing.xl,
+    dialContainer: {
+        position: 'absolute',
+        width: 200,
+        height: 200,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tickMarkWrapper: {
+        position: 'absolute',
+        width: 200,
+        height: 200,
+        alignItems: 'center',
+    },
+    tickMark: {
+        backgroundColor: theme.colors.border.light,
+        borderBottomLeftRadius: 2,
+        borderBottomRightRadius: 2,
+    },
+    tickMarkMinor: {
+        width: 2,
+        height: 6,
+    },
+    tickMarkMajor: {
+        width: 3,
+        height: 10,
+        backgroundColor: theme.colors.border.medium,
+    },
+    tickMarkActive: {
+        backgroundColor: theme.colors.primary,
+        shadowColor: theme.colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    statusTextContainer: {
+        position: 'absolute',
+        bottom: -60,
+        alignItems: 'center',
         width: '100%',
-        paddingHorizontal: theme.spacing.xl,
-        backgroundColor: theme.colors.background.card,
-        borderRadius: theme.borderRadius.lg,
-        paddingVertical: theme.spacing.md,
-        ...theme.shadows.sm,
-    },
-    checklistItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: theme.spacing.sm,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: theme.colors.border.light,
-    },
-    iconContainer: {
-        width: 30,
-        alignItems: 'center',
-    },
-    checklistText: {
-        fontSize: 15,
-        color: theme.colors.text.secondary,
-        marginLeft: theme.spacing.sm,
-    },
-    checklistTextRunning: {
-        color: theme.colors.primary,
-        fontWeight: '600',
-    },
-    checklistTextDone: {
-        color: theme.colors.text.primary,
-        fontWeight: '500',
     },
 });

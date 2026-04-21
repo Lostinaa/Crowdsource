@@ -4,7 +4,7 @@
     "slug": "cs-qoe",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-icon.png",
     "iconBackgroundColor": "#ffffff",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -37,7 +37,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/app-icon.png",
           "color": "#8ec63f",
           "sounds": []
         }

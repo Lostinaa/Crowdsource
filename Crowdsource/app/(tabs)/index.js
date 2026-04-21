@@ -72,7 +72,7 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="tele Crowdsource" showLogo={true} />
+      <ScreenHeader title="TeleCrowd" showLogo={true} />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
 

@@ -66,9 +66,10 @@ class CallDropService : InCallService() {
         Log.d(TAG, "Call added — attaching callback, launching UI")
 
         val callStart = System.currentTimeMillis()
-        var everActive = false   // did this call ever reach ACTIVE state?
-        var dialingTimeMs = 0L   // when radio dialing started (T0 for true CST)
-        var activeTimeMs  = 0L   // when call was answered (T1 for true CST)
+        var everActive = false
+        var dialingTimeMs = 0L   // T0: STATE_DIALING (call submitted to radio)
+        var activeTimeMs  = 0L   // T2: STATE_ACTIVE (call answered/connected)
+        var alertingTimeMs = 0L  // T1: ALERTING detected via onConnectionEvent
 
         // Launch the in-call activity
         launchInCallActivity(call)
@@ -88,15 +89,17 @@ class CallDropService : InCallService() {
                 Log.d(TAG, "Call state changed: $stateName")
 
                 when (state) {
-                    // T0: call submitted to radio/network — true start of CST
                     Call.STATE_DIALING -> {
                         dialingTimeMs = System.currentTimeMillis()
                     }
-                    // T1: call answered/connected — end of CST
                     Call.STATE_ACTIVE -> {
                         everActive = true
                         if (activeTimeMs == 0L) {
                             activeTimeMs = System.currentTimeMillis()
+                            val cstMs = if (alertingTimeMs > 0L) alertingTimeMs - dialingTimeMs else activeTimeMs - dialingTimeMs
+                            val ringMs = if (alertingTimeMs > 0L) activeTimeMs - alertingTimeMs else 0L
+                            val source = if (alertingTimeMs > 0L) "DIALING→ALERTING" else "DIALING→ACTIVE (fallback)"
+                            Log.d(TAG, "Call connected — CST: ${cstMs}ms ($source), ring: ${ringMs}ms")
                         }
                     }
                 }
@@ -106,25 +109,25 @@ class CallDropService : InCallService() {
                     val disconnectCause = details?.disconnectCause
                     val callDuration = System.currentTimeMillis() - callStart
 
-                    // True network CST: DIALING → ACTIVE (excludes Android intent overhead)
-                    // Falls back to 0 if call never connected (busy, rejected, etc.)
-                    val setupTimeMs = if (dialingTimeMs > 0L && activeTimeMs > 0L)
-                        activeTimeMs - dialingTimeMs else 0L
+                    // CST priority: DIALING→ALERTING (true network CST) > DIALING→ACTIVE (fallback)
+                    val setupTimeMs = when {
+                        dialingTimeMs > 0L && alertingTimeMs > 0L -> alertingTimeMs - dialingTimeMs
+                        dialingTimeMs > 0L && activeTimeMs > 0L   -> activeTimeMs - dialingTimeMs
+                        else -> 0L
+                    }
 
                     if (disconnectCause != null) {
                         val code = disconnectCause.code
                         var label = codeToLabel(code)
                         val description = disconnectCause.description?.toString() ?: ""
 
-                        // If call ended with LOCAL but never went ACTIVE, the remote party
-                        // was busy and the device auto-dropped it — report as NOT_CONNECTED
-                        // so the React side correctly ignores it (not counted as completed call)
                         if (label == "LOCAL" && !everActive) {
-                            Log.d(TAG, "LOCAL disconnect but call never went ACTIVE — treating as NOT_CONNECTED (busy/failed)")
+                            Log.d(TAG, "LOCAL disconnect but call never went ACTIVE — treating as NOT_CONNECTED")
                             label = "NOT_CONNECTED"
                         }
 
-                        Log.d(TAG, "Call disconnected — cause: $label ($code), everActive: $everActive, setupTimeMs: ${setupTimeMs}ms, description: $description, duration: ${callDuration}ms")
+                        val cstSource = if (alertingTimeMs > 0L) "DIALING→ALERTING" else "DIALING→ACTIVE"
+                        Log.d(TAG, "Call disconnected — cause: $label ($code), CST: ${setupTimeMs}ms ($cstSource), duration: ${callDuration}ms")
 
                         onCallDisconnected?.invoke(code, label, description, callDuration, setupTimeMs)
                     } else {
@@ -136,8 +139,29 @@ class CallDropService : InCallService() {
                     cancelNotification()
                 }
             }
+
+            /**
+             * Detects ALERTING via vendor connection events.
+             * Samsung: 'com.samsung.telecom.Call.EVENT_SET_ALERTING'
+             * fires when the remote phone starts ringing (network ALERTING).
+             * This gives true CST = DIALING → ALERTING (excludes ring time).
+             * On non-Samsung devices, falls back to DIALING → ACTIVE.
+             */
+            override fun onConnectionEvent(call: Call, event: String, extras: android.os.Bundle?) {
+                val sinceDialing = if (dialingTimeMs > 0L) System.currentTimeMillis() - dialingTimeMs else -1L
+
+                if (event.contains("ALERTING", ignoreCase = true)
+                    && dialingTimeMs > 0L && activeTimeMs == 0L && alertingTimeMs == 0L) {
+                    alertingTimeMs = System.currentTimeMillis()
+                    Log.d(TAG, "CST T1: ALERTING detected at +${sinceDialing}ms via event='$event'")
+                }
+            }
         })
     }
+
+
+
+
 
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)

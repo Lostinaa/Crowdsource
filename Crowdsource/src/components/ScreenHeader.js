@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDrawer } from '../context/DrawerContext';
 import { theme } from '../constants/theme';
@@ -34,8 +34,9 @@ export default function ScreenHeader({ title, showDrawer = true, showLogo = fals
         <Text style={styles.title} numberOfLines={1}>{title}</Text>
 
         <View style={styles.rightPlaceholder}>
-          {/* Optional Right Action Button */}
-          <Ionicons name="notifications-outline" size={24} color="rgba(255,255,255,0.8)" />
+          <TouchableOpacity onPress={() => Alert.alert('Notifications', 'No new notifications at this time.')}>
+            <Ionicons name="notifications-outline" size={24} color="rgba(255,255,255,0.8)" />
+          </TouchableOpacity>
         </View>
       </View>
     </LinearGradient>

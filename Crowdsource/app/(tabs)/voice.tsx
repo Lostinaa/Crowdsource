@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Button, Alert, Platform, PermissionsAndroid, ScrollView, Linking, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Button, Alert, Platform, PermissionsAndroid, ScrollView, Linking, TouchableOpacity, AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useRef } from 'react';
 import { useQoE } from '../../src/context/QoEContext';
@@ -358,16 +358,22 @@ export default function VoiceScreen() {
       let granted = CallMetrics.isPermissionGranted();
 
       if (!granted && Platform.OS === 'android') {
-        // Request permissions (READ_PHONE_STATE and READ_CALL_LOG)
+        // Request permissions (READ_PHONE_STATE, READ_CALL_LOG, and READ_CONTACTS for Caller ID)
         const permissions = [
           PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
           PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+          PermissionsAndroid.PERMISSIONS.READ_CONTACTS,
         ];
 
         const results = await PermissionsAndroid.requestMultiple(permissions);
         const phoneGranted = results[PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE] === PermissionsAndroid.RESULTS.GRANTED;
         const callLogGranted = results[PermissionsAndroid.PERMISSIONS.READ_CALL_LOG] === PermissionsAndroid.RESULTS.GRANTED;
+        const contactsGranted = results[PermissionsAndroid.PERMISSIONS.READ_CONTACTS] === PermissionsAndroid.RESULTS.GRANTED;
         granted = phoneGranted;
+
+        if (!contactsGranted) {
+          console.warn('[Voice] READ_CONTACTS permission denied - Caller ID names will not be shown in active calls');
+        }
 
         if (!granted) {
           // Permission denied - check if we should show rationale
@@ -598,6 +604,27 @@ export default function VoiceScreen() {
 
     console.log('[Voice] Auto-starting call metrics monitoring...');
     handleStart();
+  }, []);
+
+  // ── Re-check state when app returns to foreground ──
+  // Fixes: after accepting the default dialer role dialog (which takes the app
+  // to background), isListening stays false because requestCallRole() resolved
+  // before the user actually accepted. This re-checks and starts if needed.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active' && !isListeningRef.current) {
+        // App came back to foreground and we're not listening yet
+        const hasPermission = CallMetrics.isPermissionGranted();
+        const hasRole = CallDropBridgeModule ? await CallDropBridgeModule.isCallRoleHeld() : true;
+
+        if (hasPermission && hasRole) {
+          console.log('[Voice] App resumed — permissions & role granted, auto-starting...');
+          handleStart();
+        }
+      }
+    });
+
+    return () => subscription.remove();
   }, []);
 
   const [showDialpad, setShowDialpad] = useState(false);

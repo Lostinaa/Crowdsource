@@ -16,9 +16,14 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import android.Manifest
+import android.content.pm.PackageManager
+import android.provider.ContactsContract
+import android.net.Uri
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Space
 
 /**
  * Minimal in-call activity providing basic call controls.
@@ -37,14 +42,17 @@ class InCallActivity : Activity() {
         var instance: InCallActivity? = null
     }
 
-    private lateinit var callerText: TextView
+    private lateinit var avatarContainer: LinearLayout
+    private lateinit var avatarText: TextView
+    private lateinit var callerNameText: TextView
+    private lateinit var callerNumberText: TextView
     private lateinit var statusText: TextView
     private lateinit var timerText: TextView
-    private lateinit var muteBtn: TextView
-    private lateinit var speakerBtn: TextView
-    private lateinit var hangupBtn: TextView
-    private lateinit var answerBtn: TextView
-    private lateinit var declineBtn: TextView
+    private lateinit var muteBtn: LinearLayout
+    private lateinit var speakerBtn: LinearLayout
+    private lateinit var hangupBtn: LinearLayout
+    private lateinit var answerBtn: LinearLayout
+    private lateinit var declineBtn: LinearLayout
     private lateinit var inCallControls: LinearLayout
     private lateinit var incomingControls: LinearLayout
 
@@ -108,40 +116,76 @@ class InCallActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setBackgroundColor(Color.parseColor("#1A1A2E"))
-            setPadding(dp(24), dp(60), dp(24), dp(40))
+            // Deep sleek gradient background
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.parseColor("#0F2027"), Color.parseColor("#203A43"), Color.parseColor("#2C5364"))
+            )
+            setPadding(dp(24), dp(80), dp(24), dp(40))
         }
 
-        // Caller info
-        callerText = TextView(this).apply {
-            text = "Unknown"
+        // Avatar Circle
+        avatarContainer = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#4AB3A1"))
+            }
+        }
+        avatarText = TextView(this).apply {
+            text = "?"
             setTextColor(Color.WHITE)
-            textSize = 28f
+            textSize = 52f
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
         }
-        root.addView(callerText, LinearLayout.LayoutParams(
+        avatarContainer.addView(avatarText, LinearLayout.LayoutParams(dp(110), dp(110)))
+        root.addView(avatarContainer, LinearLayout.LayoutParams(dp(110), dp(110)).apply {
+            bottomMargin = dp(24)
+        })
+
+        // Caller Name
+        callerNameText = TextView(this).apply {
+            text = "Unknown"
+            setTextColor(Color.WHITE)
+            textSize = 34f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+        }
+        root.addView(callerNameText, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = dp(40) })
+        ).apply { bottomMargin = dp(4) })
+
+        // Caller Number
+        callerNumberText = TextView(this).apply {
+            text = ""
+            setTextColor(Color.parseColor("#BBBBCC"))
+            textSize = 18f
+            gravity = Gravity.CENTER
+        }
+        root.addView(callerNumberText, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(24) })
 
         // Status text
         statusText = TextView(this).apply {
             text = "Calling..."
-            setTextColor(Color.parseColor("#8888AA"))
-            textSize = 16f
+            setTextColor(Color.parseColor("#88C0D0"))
+            textSize = 18f
             gravity = Gravity.CENTER
         }
         root.addView(statusText, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = dp(8) })
+        ).apply { bottomMargin = dp(8) })
 
         // Timer
         timerText = TextView(this).apply {
             text = "00:00"
             setTextColor(Color.WHITE)
-            textSize = 48f
+            textSize = 36f
             typeface = Typeface.DEFAULT
             gravity = Gravity.CENTER
             visibility = View.GONE
@@ -149,85 +193,121 @@ class InCallActivity : Activity() {
         root.addView(timerText, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = dp(40) })
+        ))
 
         // Spacer
-        val spacer = View(this)
+        val spacer = Space(this)
         root.addView(spacer, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
         ))
 
-        // ── In-call controls (mute, speaker, hangup) ──
+        // ── In-call controls (mute, keypad, speaker) ──
         inCallControls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(40) }
         }
 
-        muteBtn = createCircleButton("🎤", Color.parseColor("#2D2D44"), dp(64)) {
+        muteBtn = createIconButton("🎤", "Mute", Color.parseColor("#3B4252"), dp(72)) {
             toggleMute()
         }
-        speakerBtn = createCircleButton("🔊", Color.parseColor("#2D2D44"), dp(64)) {
+        val keypadBtn = createIconButton("▦", "Keypad", Color.parseColor("#3B4252"), dp(72)) {
+            // Placeholder for keypad
+        }
+        speakerBtn = createIconButton("🔊", "Speaker", Color.parseColor("#3B4252"), dp(72)) {
             toggleSpeaker()
         }
-        hangupBtn = createCircleButton("✕", Color.parseColor("#FF3B30"), dp(72)) {
-            hangUp()
-        }
 
-        inCallControls.addView(muteBtn, LinearLayout.LayoutParams(dp(64), dp(64)).apply {
-            marginEnd = dp(24)
-        })
-        inCallControls.addView(hangupBtn, LinearLayout.LayoutParams(dp(72), dp(72)).apply {
-            marginEnd = dp(24)
-        })
-        inCallControls.addView(speakerBtn, LinearLayout.LayoutParams(dp(64), dp(64)))
+        inCallControls.addView(muteBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        inCallControls.addView(keypadBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        inCallControls.addView(speakerBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
 
-        root.addView(inCallControls, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = dp(40) })
+        root.addView(inCallControls)
 
-        // ── Incoming call controls (answer, decline) ──
+        // ── Bottom Action row (Hangup / Answer) ──
         incomingControls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(32) }
         }
 
-        declineBtn = createCircleButton("✕", Color.parseColor("#FF3B30"), dp(72)) {
+        hangupBtn = createIconButton("📞", "End", Color.parseColor("#BF616A"), dp(84)) {
+            hangUp()
+        }
+        declineBtn = createIconButton("📞", "Decline", Color.parseColor("#BF616A"), dp(84)) {
             rejectCall()
         }
-        answerBtn = createCircleButton("✓", Color.parseColor("#34C759"), dp(72)) {
+        answerBtn = createIconButton("📞", "Answer", Color.parseColor("#A3BE8C"), dp(84)) {
             answerCall()
         }
 
-        incomingControls.addView(declineBtn, LinearLayout.LayoutParams(dp(72), dp(72)).apply {
-            marginEnd = dp(60)
-        })
-        incomingControls.addView(answerBtn, LinearLayout.LayoutParams(dp(72), dp(72)))
+        // Active call hangup row
+        val activeCallActions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(32) }
+        }
+        activeCallActions.addView(hangupBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        
+        // Setup incoming UI
+        incomingControls.addView(declineBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        incomingControls.addView(answerBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
 
-        root.addView(incomingControls, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = dp(40) })
+        // We will toggle visibility of the hangup row and incoming controls dynamically
+        hangupBtn.tag = "activeActions" // used to identify in toggle
+        root.addView(activeCallActions)
+        root.addView(incomingControls)
+
+        // Save reference to active actions parent for easy toggling
+        inCallControls.tag = activeCallActions
 
         setContentView(root)
     }
 
-    private fun createCircleButton(label: String, bgColor: Int, size: Int, onClick: () -> Unit): TextView {
-        return TextView(this).apply {
-            text = label
-            textSize = 24f
-            setTextColor(Color.WHITE)
+    private fun createIconButton(iconText: String, label: String, bgColor: Int, size: Int, onClick: () -> Unit): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(bgColor)
+            
+            val btn = TextView(this@InCallActivity).apply {
+                text = iconText
+                textSize = 32f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(bgColor)
+                }
+                setOnClickListener { onClick() }
+                isClickable = true
+                isFocusable = true
             }
-            setOnClickListener { onClick() }
-            isClickable = true
-            isFocusable = true
+            // Add slight shadow
+            btn.elevation = 8f
+
+            val labelText = TextView(this@InCallActivity).apply {
+                text = label
+                setTextColor(Color.parseColor("#E5E9F0"))
+                textSize = 14f
+                gravity = Gravity.CENTER
+            }
+
+            addView(btn, LinearLayout.LayoutParams(size, size).apply { bottomMargin = 8 })
+            addView(labelText, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
     }
+
+
 
     private fun setupCallbacks() {
         val call = CallDropService.currentCall
@@ -244,26 +324,69 @@ class InCallActivity : Activity() {
     private fun updateCallerInfo(call: Call) {
         val handle = call.details?.handle
         val number = handle?.schemeSpecificPart ?: "Unknown"
-        callerText.text = number
+
+        var contactName: String? = null
+
+        // Try to fetch contact name if permission is granted
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                contactName = resolveContactName(number)
+            } else {
+                Log.w(TAG, "READ_CONTACTS permission not granted, cannot resolve name")
+            }
+        } else {
+            contactName = resolveContactName(number)
+        }
+
+        if (contactName != null) {
+            callerNameText.text = contactName
+            callerNumberText.text = number
+            avatarText.text = contactName.firstOrNull()?.uppercase() ?: "?"
+        } else {
+            callerNameText.text = number
+            callerNumberText.text = "Unknown Contact"
+            avatarText.text = "#"
+        }
+    }
+
+    private fun resolveContactName(phoneNumber: String): String? {
+        try {
+            val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber))
+            val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
+            val cursor = contentResolver.query(uri, projection, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val nameIndex = it.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                    return it.getString(nameIndex)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed resolving contact name", e)
+        }
+        return null
     }
 
     private fun updateUIForState(state: Int) {
+        val activeCallActions = inCallControls.tag as LinearLayout
         when (state) {
             Call.STATE_RINGING -> {
                 statusText.text = "Incoming Call"
                 inCallControls.visibility = View.GONE
+                activeCallActions.visibility = View.GONE
                 incomingControls.visibility = View.VISIBLE
                 timerText.visibility = View.GONE
             }
             Call.STATE_DIALING, Call.STATE_CONNECTING -> {
                 statusText.text = "Calling..."
                 inCallControls.visibility = View.VISIBLE
+                activeCallActions.visibility = View.VISIBLE
                 incomingControls.visibility = View.GONE
                 timerText.visibility = View.GONE
             }
             Call.STATE_ACTIVE -> {
                 statusText.text = "Connected"
                 inCallControls.visibility = View.VISIBLE
+                activeCallActions.visibility = View.VISIBLE
                 incomingControls.visibility = View.GONE
                 timerText.visibility = View.VISIBLE
                 if (callStartTime == 0L) {
@@ -285,9 +408,9 @@ class InCallActivity : Activity() {
     private fun toggleMute() {
         isMuted = !isMuted
         CallDropService.currentService?.setMuted(isMuted)
-        muteBtn.background = GradientDrawable().apply {
+        muteBtn.getChildAt(0).background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(if (isMuted) Color.parseColor("#5856D6") else Color.parseColor("#2D2D44"))
+            setColor(if (isMuted) Color.parseColor("#5E81AC") else Color.parseColor("#3B4252"))
         }
     }
 
@@ -297,9 +420,9 @@ class InCallActivity : Activity() {
             if (isSpeaker) android.telecom.CallAudioState.ROUTE_SPEAKER
             else android.telecom.CallAudioState.ROUTE_EARPIECE
         )
-        speakerBtn.background = GradientDrawable().apply {
+        speakerBtn.getChildAt(0).background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(if (isSpeaker) Color.parseColor("#5856D6") else Color.parseColor("#2D2D44"))
+            setColor(if (isSpeaker) Color.parseColor("#5E81AC") else Color.parseColor("#3B4252"))
         }
     }
 
